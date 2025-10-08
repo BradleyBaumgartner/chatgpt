@@ -769,7 +769,6 @@
     }
   }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
   <div class="floating-nav">
@@ -1135,6 +1134,16 @@ Mit freundlichen Grüßen"></textarea>
     </div>
   </div>
 <script>
+var fileSystemHelper = createFileSystemHelper();
+var localStorage = (function() {
+  try {
+    if (window.localStorage) {
+      return window.localStorage;
+    }
+  } catch (storageError) {
+  }
+  return createFileStorage();
+})();
 var selectedReportsStore = {};
 var filteredEntries = [];
 var editingEntryId = null;
@@ -1148,6 +1157,497 @@ var dayOrder = {
   "Donnerstag": 4,
   "Freitag": 5
 };
+
+function getWeekEntriesSorted(weekNumber, yearNumber) {
+  var weekEntries = entries.filter(function(e) {
+    return String(e.week) === String(weekNumber) && String(e.year) === String(yearNumber);
+  });
+  weekEntries.sort(function(a, b) {
+    var orderA = dayOrder[a.workday] || 0;
+    var orderB = dayOrder[b.workday] || 0;
+    if (orderA === orderB) {
+      return (a.startTime || '').localeCompare(b.startTime || '');
+    }
+    return orderA - orderB;
+  });
+  return weekEntries;
+}
+
+function createFileSystemHelper() {
+  try {
+    var fso = new ActiveXObject('Scripting.FileSystemObject');
+    var shell = new ActiveXObject('WScript.Shell');
+    var baseFolder = null;
+
+    function ensureBaseFolder() {
+      if (baseFolder) {
+        return baseFolder;
+      }
+      var documents = null;
+      try {
+        documents = shell.SpecialFolders('MyDocuments');
+      } catch (specialFoldersError) {
+        documents = null;
+      }
+      if (!documents || documents === '') {
+        try {
+          documents = shell.ExpandEnvironmentStrings('%USERPROFILE%\\Documents');
+        } catch (userProfileError) {
+          documents = null;
+        }
+      }
+      if (!documents || documents === '') {
+        try {
+          documents = shell.ExpandEnvironmentStrings('%TEMP%');
+        } catch (tempError) {
+          documents = null;
+        }
+      }
+      if (!documents || documents === '') {
+        return null;
+      }
+      var folder = fso.BuildPath(documents, 'Wochenbericht-HTA');
+      if (!fso.FolderExists(folder)) {
+        fso.CreateFolder(folder);
+      }
+      baseFolder = folder;
+      return baseFolder;
+    }
+
+    function writeText(fullPath, content, charset) {
+      var stream = new ActiveXObject('ADODB.Stream');
+      stream.Type = 2;
+      stream.Charset = charset || 'utf-8';
+      stream.Open();
+      stream.WriteText(content);
+      stream.SaveToFile(fullPath, 2);
+      stream.Close();
+    }
+
+    function readText(fullPath, charset) {
+      if (!fso.FileExists(fullPath)) {
+        return '';
+      }
+      var stream = new ActiveXObject('ADODB.Stream');
+      stream.Type = 2;
+      stream.Charset = charset || 'utf-8';
+      stream.Open();
+      stream.LoadFromFile(fullPath);
+      var text = stream.ReadText();
+      stream.Close();
+      return text;
+    }
+
+    return {
+      getBaseFolder: ensureBaseFolder,
+      saveTextFile: function(filename, content) {
+        var folder = ensureBaseFolder();
+        if (!folder) {
+          return null;
+        }
+        var safeName = sanitizeFilename(filename || 'export.txt');
+        var fullPath = fso.BuildPath(folder, safeName);
+        writeText(fullPath, content, 'utf-8');
+        return fullPath;
+      },
+      saveBinaryFile: function(filename, content) {
+        var folder = ensureBaseFolder();
+        if (!folder) {
+          return null;
+        }
+        var safeName = sanitizeFilename(filename || 'export.pdf');
+        var fullPath = fso.BuildPath(folder, safeName);
+        writeText(fullPath, content, 'windows-1252');
+        return fullPath;
+      },
+      readTextFile: function(path) {
+        try {
+          return readText(path, 'utf-8');
+        } catch (readError) {
+          return '';
+        }
+      },
+      writeTextFile: function(path, content) {
+        try {
+          writeText(path, content, 'utf-8');
+        } catch (writeError) {
+        }
+      },
+      getStorageFilePath: function() {
+        var folder = ensureBaseFolder();
+        if (!folder) {
+          return null;
+        }
+        return fso.BuildPath(folder, 'storage.json');
+      }
+    };
+  } catch (helperError) {
+    return null;
+  }
+}
+
+function createMemoryStorage() {
+  var cache = {};
+  var storage = {};
+
+  function updateLength() {
+    var count = 0;
+    var key;
+    for (key in cache) {
+      if (cache.hasOwnProperty(key)) {
+        count += 1;
+      }
+    }
+    storage.length = count;
+  }
+
+  storage.getItem = function(key) {
+    return cache.hasOwnProperty(key) ? cache[key] : null;
+  };
+
+  storage.setItem = function(key, value) {
+    cache[key] = String(value);
+    updateLength();
+  };
+
+  storage.removeItem = function(key) {
+    if (cache.hasOwnProperty(key)) {
+      delete cache[key];
+      updateLength();
+    }
+  };
+
+  storage.clear = function() {
+    cache = {};
+    updateLength();
+  };
+
+  storage.key = function(index) {
+    var keys = [];
+    var key;
+    for (key in cache) {
+      if (cache.hasOwnProperty(key)) {
+        keys.push(key);
+      }
+    }
+    if (index >= 0 && index < keys.length) {
+      return keys[index];
+    }
+    return null;
+  };
+
+  updateLength();
+  return storage;
+}
+
+function createFileStorage() {
+  if (!fileSystemHelper) {
+    return createMemoryStorage();
+  }
+  var storagePath = fileSystemHelper.getStorageFilePath();
+  if (!storagePath) {
+    return createMemoryStorage();
+  }
+  var cache = {};
+  try {
+    var existing = fileSystemHelper.readTextFile(storagePath);
+    if (existing) {
+      cache = JSON.parse(existing);
+    }
+  } catch (parseError) {
+    cache = {};
+  }
+  var storage = {};
+
+  function persist() {
+    try {
+      fileSystemHelper.writeTextFile(storagePath, JSON.stringify(cache));
+    } catch (persistError) {
+    }
+    updateLength();
+  }
+
+  function updateLength() {
+    var count = 0;
+    var key;
+    for (key in cache) {
+      if (cache.hasOwnProperty(key)) {
+        count += 1;
+      }
+    }
+    storage.length = count;
+  }
+
+  storage.getItem = function(key) {
+    return cache.hasOwnProperty(key) ? cache[key] : null;
+  };
+
+  storage.setItem = function(key, value) {
+    cache[key] = String(value);
+    persist();
+  };
+
+  storage.removeItem = function(key) {
+    if (cache.hasOwnProperty(key)) {
+      delete cache[key];
+      persist();
+    }
+  };
+
+  storage.clear = function() {
+    cache = {};
+    persist();
+  };
+
+  storage.key = function(index) {
+    var keys = [];
+    var key;
+    for (key in cache) {
+      if (cache.hasOwnProperty(key)) {
+        keys.push(key);
+      }
+    }
+    if (index >= 0 && index < keys.length) {
+      return keys[index];
+    }
+    return null;
+  };
+
+  updateLength();
+  return storage;
+}
+
+function sanitizeFilename(name) {
+  var base = String(name || 'datei');
+  return base.replace(/[\\\/\:*?"<>|]/g, '_');
+}
+
+function padNumber(value) {
+  return value < 10 ? '0' + value : String(value);
+}
+
+function formatDateISO(date) {
+  return date.getFullYear() + '-' + padNumber(date.getMonth() + 1) + '-' + padNumber(date.getDate());
+}
+
+function formatDateTimeISO(date) {
+  return formatDateISO(date) + 'T' + padNumber(date.getHours()) + ':' + padNumber(date.getMinutes()) + ':' + padNumber(date.getSeconds());
+}
+
+function formatGermanDate(date) {
+  return padNumber(date.getDate()) + '.' + padNumber(date.getMonth() + 1) + '.' + date.getFullYear();
+}
+
+function formatGermanDateTime(date) {
+  return formatGermanDate(date) + ' ' + padNumber(date.getHours()) + ':' + padNumber(date.getMinutes()) + ':' + padNumber(date.getSeconds());
+}
+
+function wrapTextByLength(text, maxChars) {
+  var output = [];
+  if (typeof text !== 'string') {
+    text = text === undefined || text === null ? '' : String(text);
+  }
+  var normalized = text.replace(/\r/g, '');
+  var paragraphs = normalized.split('\n');
+  for (var p = 0; p < paragraphs.length; p++) {
+    var paragraph = paragraphs[p];
+    if (paragraph === '') {
+      output.push('');
+      continue;
+    }
+    var words = paragraph.split(/\s+/);
+    var currentLine = '';
+    for (var w = 0; w < words.length; w++) {
+      var word = words[w];
+      if (currentLine.length === 0) {
+        currentLine = word;
+      } else if ((currentLine + ' ' + word).length <= maxChars) {
+        currentLine += ' ' + word;
+      } else {
+        output.push(currentLine);
+        currentLine = word;
+      }
+    }
+    if (currentLine.length > 0) {
+      output.push(currentLine);
+    }
+  }
+  if (output.length === 0) {
+    output.push('');
+  }
+  return output;
+}
+
+function escapePdfText(text) {
+  var safe = text.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+  return safe;
+}
+
+function formatPdfNumber(value) {
+  var num = Math.round(Number(value) * 100) / 100;
+  if (!isFinite(num)) {
+    num = 0;
+  }
+  var str = num.toFixed(2);
+  while (str.length > 0 && str.indexOf('.') !== -1 && str.charAt(str.length - 1) === '0') {
+    str = str.substring(0, str.length - 1);
+  }
+  if (str.charAt(str.length - 1) === '.') {
+    str = str.substring(0, str.length - 1);
+  }
+  return str;
+}
+
+function createWeekPages(week, year, personal, weekEntries) {
+  var pages = [];
+  var currentPage = null;
+  var currentY = 0;
+
+  function startPage(isContinuation) {
+    currentPage = [];
+    pages.push(currentPage);
+    currentY = 780;
+    var title = isContinuation ? 'Wochenbericht (Fortsetzung)' : 'Wochenbericht';
+    addLine(title, 18, 60);
+    addLine('Kalenderwoche: ' + week + ', ' + year, 12, 50);
+    addLine('Datum: ' + formatGermanDate(new Date()), 11, 50);
+    addLine('Name: ' + (personal.name || '-'), 11, 50);
+    addLine('Ausbilder/in: ' + (personal.position || '-'), 11, 50);
+    addLine('Fachkraft: ' + (personal.specialist || '-'), 11, 50);
+    addLine('Dienstort: ' + (personal.department || '-'), 11, 50);
+    addSpacer(6);
+    addLine('Einträge dieser Woche', 13, 50);
+    addSpacer(4);
+  }
+
+  function ensureSpace(required) {
+    if (currentY - required < 60) {
+      startPage(true);
+    }
+  }
+
+  function addSpacer(amount) {
+    currentY -= amount;
+  }
+
+  function addLine(text, size, x) {
+    if (currentPage === null) {
+      startPage(false);
+    }
+    currentPage.push({
+      text: text,
+      size: size || 11,
+      x: x || 50,
+      y: currentY
+    });
+    currentY -= size >= 16 ? 22 : 14;
+  }
+
+  startPage(false);
+
+  var totalHours = 0;
+  if (!weekEntries || weekEntries.length === 0) {
+    ensureSpace(30);
+    addLine('Keine Einträge für diese Woche.', 11, 50);
+  } else {
+    for (var i = 0; i < weekEntries.length; i++) {
+      var entry = weekEntries[i];
+      var hoursValue = parseFloat(entry.hours || '0');
+      if (!isFinite(hoursValue)) {
+        hoursValue = 0;
+      }
+      totalHours += hoursValue;
+      ensureSpace(40);
+      var header = entry.workday + ' • ' + entry.startTime + ' - ' + entry.endTime + ' (' + hoursValue.toFixed(2) + 'h)';
+      addLine(header, 11, 50);
+      var wrapped = wrapTextByLength(entry.activity || '-', 95);
+      for (var j = 0; j < wrapped.length; j++) {
+        ensureSpace(18);
+        addLine('   ' + wrapped[j], 10, 60);
+      }
+      addSpacer(6);
+    }
+  }
+
+  ensureSpace(60);
+  addLine('Gesamtstunden (Woche): ' + totalHours.toFixed(2) + 'h', 11, 50);
+  addSpacer(10);
+  addLine('__________________________', 11, 50);
+  addLine('Unterschrift Ausbilder/in', 10, 50);
+
+  return pages;
+}
+
+function buildPdfFromPages(pages) {
+  var totalPages = pages.length;
+  if (totalPages === 0) {
+    pages = [[{ text: 'Keine Daten vorhanden.', size: 12, x: 50, y: 780 }]];
+    totalPages = 1;
+  }
+  var header = '%PDF-1.4\n';
+  var body = '';
+  var offsets = [];
+  var fontObjectId = 3 + totalPages * 2;
+
+  function appendObject(id, content) {
+    offsets[id] = header.length + body.length;
+    body += id + ' 0 obj\n' + content + '\nendobj\n';
+  }
+
+  appendObject(1, '<< /Type /Catalog /Pages 2 0 R >>');
+
+  var kids = [];
+  var pageIndex;
+  for (pageIndex = 0; pageIndex < totalPages; pageIndex++) {
+    kids.push((4 + pageIndex * 2) + ' 0 R');
+  }
+  appendObject(2, '<< /Type /Pages /Kids [' + kids.join(' ') + '] /Count ' + totalPages + ' >>');
+
+  for (pageIndex = 0; pageIndex < totalPages; pageIndex++) {
+    var pageLines = pages[pageIndex];
+    var commands = ['BT'];
+    for (var lineIndex = 0; lineIndex < pageLines.length; lineIndex++) {
+      var line = pageLines[lineIndex];
+      commands.push('1 0 0 1 ' + formatPdfNumber(line.x || 50) + ' ' + formatPdfNumber(line.y || 780) + ' Tm');
+      commands.push('/F1 ' + formatPdfNumber(line.size || 11) + ' Tf');
+      commands.push('(' + escapePdfText(line.text || '') + ') Tj');
+    }
+    commands.push('ET');
+    var stream = commands.join('\n');
+    var contentId = 3 + pageIndex * 2;
+    var content = '<< /Length ' + stream.length + ' >>\nstream\n' + stream + '\nendstream';
+    appendObject(contentId, content);
+    var pageId = 4 + pageIndex * 2;
+    var pageObject = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents ' + contentId + ' 0 R /Resources << /Font << /F1 ' + fontObjectId + ' 0 R >> >> >>';
+    appendObject(pageId, pageObject);
+  }
+
+  appendObject(fontObjectId, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+
+  var xrefStart = header.length + body.length;
+  var xref = 'xref\n0 ' + (fontObjectId + 1) + '\n0000000000 65535 f \n';
+  for (var id = 1; id <= fontObjectId; id++) {
+    var offset = offsets[id] || 0;
+    var padded = ('0000000000' + offset).slice(-10);
+    xref += padded + ' 00000 n \n';
+  }
+  var trailer = 'trailer << /Size ' + (fontObjectId + 1) + ' /Root 1 0 R >>\nstartxref\n' + xrefStart + '\n%%EOF';
+  return header + body + xref + trailer;
+}
+
+function savePdfDocument(filename, pages) {
+  var pdfData = buildPdfFromPages(pages);
+  if (fileSystemHelper) {
+    var savedPath = fileSystemHelper.saveBinaryFile(filename, pdfData);
+    if (savedPath) {
+      alert('PDF gespeichert unter:\n' + savedPath);
+    } else {
+      alert('PDF konnte nicht gespeichert werden.');
+    }
+  } else {
+    alert('PDF-Export wird in dieser Umgebung nicht unterstützt.');
+  }
+}
 
 function forEachNodeList(list, callback) {
   for (var i = 0; i < list.length; i++) {
@@ -1428,30 +1928,26 @@ function downloadSelectedPDFs() {
     alert('Bitte wählen Sie mindestens einen Bericht aus.');
     return;
   }
-  var jspdfLib = window.jspdf || window.jsPDF;
-  if (!jspdfLib) {
-    alert('PDF-Bibliothek konnte nicht geladen werden.');
-    return;
+  var personal = {};
+  try {
+    personal = JSON.parse(localStorage.getItem('timesheetPersonal') || '{}');
+  } catch (parseError) {
+    personal = {};
   }
-  var jsPDF = jspdfLib.jsPDF || jspdfLib;
-  var doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  var personal = JSON.parse(localStorage.getItem('timesheetPersonal') || '{}');
   var sorted = selected.slice(0);
   sorted.sort();
-  var isFirst = true;
+  var allPages = [];
   for (var i = 0; i < sorted.length; i++) {
     var parts = sorted[i].split('-');
-    var week = parseInt(parts[0], 10);
-    var year = parseInt(parts[1], 10);
-    if (!isFirst) {
-      doc.addPage();
-    }
-    generatePDFForWeek(doc, week, year, personal);
-    isFirst = false;
+    var weekNumber = parseInt(parts[0], 10);
+    var yearNumber = parseInt(parts[1], 10);
+    var weekEntries = getWeekEntriesSorted(weekNumber, yearNumber);
+    var pages = createWeekPages(weekNumber, yearNumber, personal, weekEntries);
+    allPages = allPages.concat(pages);
   }
   var today = new Date();
-  var dateStr = today.toISOString().split('T')[0];
-  doc.save('Wochenberichte_Ausgewählte_' + dateStr + '.pdf');
+  var filename = 'Wochenberichte_Ausgewählte_' + formatDateISO(today) + '.pdf';
+  savePdfDocument(filename, allPages);
 }
 
 function exportSelectedReports() {
@@ -1474,11 +1970,12 @@ function exportSelectedReports() {
   var exportData = {
     entries: selectedEntries,
     personalData: personalData,
-    exportDate: new Date().toISOString(),
+    exportDate: formatDateTimeISO(new Date()),
     type: 'selected_reports',
     selectedWeeks: selected
   };
-  downloadJSON(exportData, 'Ausgewählte_Berichte_' + new Date().toISOString().split('T')[0] + '.json');
+  var today = formatDateISO(new Date());
+  downloadJSON(exportData, 'Ausgewählte_Berichte_' + today + '.json');
 }
 
 function deleteSelectedReports() {
@@ -1806,108 +2303,17 @@ function escapeHtml(unsafe) {
     .replace(/\n/g, '<br/>');
 }
 
-function generatePDFForWeek(doc, week, year, personal) {
-  var left = 12;
-  var pageWidth = doc.internal.pageSize.getWidth();
-  var usableWidth = pageWidth - left * 2;
-  var name = personal.name || '-';
-  var position = personal.position || '-';
-  var specialist = personal.specialist || '-';
-  var dept = personal.department || '-';
-  var weekEntries = entries.filter(function(e) {
-    return e.week === week && e.year === year;
-  });
-  weekEntries.sort(function(a, b) {
-    return dayOrder[a.workday] - dayOrder[b.workday];
-  });
-  var today = new Date();
-  var formatted = today.toLocaleDateString('de-DE', { year: 'numeric', month: '2-digit', day: '2-digit' });
-  doc.setFillColor(11, 98, 212);
-  doc.rect(0, 0, pageWidth, 14, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Wochenbericht', left, 9);
-  doc.setTextColor(35, 49, 70);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  var y = 22;
-  doc.text('Name: ' + name, left, y); y += 5;
-  doc.text('Ausbilder/in: ' + position, left, y); y += 5;
-  doc.text('Fachkraft: ' + specialist, left, y); y += 5;
-  doc.text('Dienstort: ' + dept, left, y); y += 5;
-  doc.text('Kalenderwoche: ' + week, left, y); y += 5;
-  doc.text('Datum: ' + formatted, left, y); y += 8;
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(11, 98, 212);
-  doc.text('Einträge dieser Woche', left, y); y += 5;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  if (weekEntries.length === 0) {
-    doc.text('Keine Einträge für diese Woche.', left, y);
-  } else {
-    var col1 = left;
-    var col2 = left + 28;
-    var col3 = left + 60;
-    var col4 = left + 90;
-    for (var i = 0; i < weekEntries.length; i++) {
-      var entry = weekEntries[i];
-      if (y > 270) {
-        doc.addPage();
-        y = 18;
-      }
-      doc.setDrawColor(200, 200, 200);
-      doc.line(left, y, pageWidth - left, y);
-      y += 4;
-      var actLines = doc.splitTextToSize(entry.activity || '-', usableWidth - (col4 - left));
-      doc.setTextColor(35, 49, 70);
-      doc.text(entry.workday, col1, y);
-      doc.text(entry.startTime + '-' + entry.endTime, col2, y);
-      doc.text(Number(entry.hours).toFixed(2) + 'h', col3, y);
-      var actY = y;
-      for (var j = 0; j < actLines.length; j++) {
-        if (j === 0) {
-          doc.text(actLines[j], col4, actY);
-        } else {
-          actY += 4;
-          doc.text(actLines[j], col4, actY);
-        }
-      }
-      y = actY + 4;
-    }
-  }
-  var total = 0;
-  for (var i = 0; i < weekEntries.length; i++) {
-    total += parseFloat(weekEntries[i].hours || '0');
-  }
-  if (y + 20 > 280) {
-    doc.addPage();
-    y = 18;
-  }
-  doc.setDrawColor(220, 220, 220);
-  doc.line(left, y, pageWidth - left, y);
-  y += 6;
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(35, 49, 70);
-  doc.setFontSize(9);
-  doc.text('Gesamtstunden (Woche): ' + total.toFixed(2) + 'h', left, y);
-  y += 14;
-  doc.text('__________________________', left, y);
-  y += 5;
-  doc.text('Unterschrift Ausbilder/in', left, y);
-}
-
 function downloadPDF() {
-  var jspdfLib = window.jspdf || window.jsPDF;
-  if (!jspdfLib) {
-    alert('PDF-Bibliothek konnte nicht geladen werden.');
-    return;
+  var personal = {};
+  try {
+    personal = JSON.parse(localStorage.getItem('timesheetPersonal') || '{}');
+  } catch (parseError) {
+    personal = {};
   }
-  var jsPDF = jspdfLib.jsPDF || jspdfLib;
-  var doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  var personal = JSON.parse(localStorage.getItem('timesheetPersonal') || '{}');
-  generatePDFForWeek(doc, currentWeek, currentYear, personal);
-  doc.save('Wochenbericht_KW' + currentWeek + '_' + currentYear + '.pdf');
+  var weekEntries = getWeekEntriesSorted(currentWeek, currentYear);
+  var pages = createWeekPages(currentWeek, currentYear, personal, weekEntries);
+  var filename = 'Wochenbericht_KW' + currentWeek + '_' + currentYear + '.pdf';
+  savePdfDocument(filename, pages);
 }
 
 function fillExampleEmail() {
@@ -1945,43 +2351,61 @@ function exportAllData() {
     entries: entries,
     personalData: JSON.parse(localStorage.getItem('timesheetPersonal') || '{}'),
     theme: localStorage.getItem('theme') || 'light',
-    exportDate: new Date().toISOString(),
+    exportDate: formatDateTimeISO(new Date()),
     version: '1.0'
   };
-  downloadJSON(allData, 'Wochenbericht_Backup_' + new Date().toISOString().split('T')[0] + '.json');
-  localStorage.setItem('lastBackup', new Date().toISOString());
+  var now = new Date();
+  var today = formatDateISO(now);
+  downloadJSON(allData, 'Wochenbericht_Backup_' + today + '.json');
+  localStorage.setItem('lastBackup', String(now.getTime()));
   updateBackupStats();
 }
 
 function exportPersonalDataOnly() {
   var personalData = {
     personalData: JSON.parse(localStorage.getItem('timesheetPersonal') || '{}'),
-    exportDate: new Date().toISOString(),
+    exportDate: formatDateTimeISO(new Date()),
     type: 'personal_only'
   };
-  downloadJSON(personalData, 'Persönliche_Daten_' + new Date().toISOString().split('T')[0] + '.json');
+  var today = formatDateISO(new Date());
+  downloadJSON(personalData, 'Persönliche_Daten_' + today + '.json');
 }
 
 function exportReportsOnly() {
   var reportsData = {
     entries: entries,
-    exportDate: new Date().toISOString(),
+    exportDate: formatDateTimeISO(new Date()),
     type: 'reports_only'
   };
-  downloadJSON(reportsData, 'Wochenberichte_' + new Date().toISOString().split('T')[0] + '.json');
+  var today = formatDateISO(new Date());
+  downloadJSON(reportsData, 'Wochenberichte_' + today + '.json');
 }
 
 function downloadJSON(data, filename) {
   var json = JSON.stringify(data, null, 2);
-  var blob = new Blob([json], { type: 'application/json' });
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  var targetName = filename || 'export.json';
+  if (fileSystemHelper) {
+    var savedPath = fileSystemHelper.saveTextFile(targetName, json);
+    if (savedPath) {
+      alert('Datei gespeichert unter:\n' + savedPath);
+    } else {
+      alert('Datei konnte nicht gespeichert werden.');
+    }
+    return;
+  }
+  if (window.Blob && window.URL && window.URL.createObjectURL) {
+    var blob = new Blob([json], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = targetName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } else {
+    alert('Export wird in dieser Umgebung nicht unterstützt.');
+  }
 }
 
 function importData() {
@@ -2090,8 +2514,13 @@ function updateBackupStats() {
   if (document.getElementById('lastEditedWeek')) { document.getElementById('lastEditedWeek').textContent = lastEditedWeek; }
   if (document.getElementById('lastBackup')) {
     if (lastBackup) {
-      var backupDate = new Date(lastBackup);
-      document.getElementById('lastBackup').textContent = backupDate.toLocaleDateString('de-DE') + ' ' + backupDate.toLocaleTimeString('de-DE');
+      var timestamp = parseInt(lastBackup, 10);
+      if (!isNaN(timestamp)) {
+        var backupDate = new Date(timestamp);
+        document.getElementById('lastBackup').textContent = formatGermanDateTime(backupDate);
+      } else {
+        document.getElementById('lastBackup').textContent = 'Unbekannt';
+      }
     } else {
       document.getElementById('lastBackup').textContent = 'Nie';
     }
@@ -2290,14 +2719,15 @@ function exportFilteredData() {
   var filteredData = {
     entries: filteredEntries,
     personalData: personalData,
-    exportDate: new Date().toISOString(),
+    exportDate: formatDateTimeISO(new Date()),
     type: 'filtered_data',
     filterInfo: {
       totalEntries: filteredEntries.length,
       totalHours: totalHours.toFixed(2)
     }
   };
-  downloadJSON(filteredData, 'Gefilterte_Wochenberichte_' + new Date().toISOString().split('T')[0] + '.json');
+  var today = formatDateISO(new Date());
+  downloadJSON(filteredData, 'Gefilterte_Wochenberichte_' + today + '.json');
 }
 
 function showDataDetails(filteredWeeks, groupedEntries) {
