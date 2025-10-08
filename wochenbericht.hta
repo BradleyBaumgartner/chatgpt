@@ -1135,15 +1135,7 @@ Mit freundlichen Grüßen"></textarea>
   </div>
 <script>
 var fileSystemHelper = createFileSystemHelper();
-var localStorage = (function() {
-  try {
-    if (window.localStorage) {
-      return window.localStorage;
-    }
-  } catch (storageError) {
-  }
-  return createFileStorage();
-})();
+var localStorage = createSafeStorage();
 var selectedReportsStore = {};
 var filteredEntries = [];
 var editingEntryId = null;
@@ -1415,6 +1407,73 @@ function createFileStorage() {
 
   updateLength();
   return storage;
+}
+
+function createSafeStorage() {
+  var preferred = null;
+
+  function ensurePreferred() {
+    if (preferred && typeof preferred.getItem === 'function' && typeof preferred.setItem === 'function') {
+      return;
+    }
+    try {
+      preferred = createFileStorage();
+    } catch (fileStorageError) {
+      preferred = null;
+    }
+    if (!preferred || typeof preferred.getItem !== 'function' || typeof preferred.setItem !== 'function') {
+      preferred = createMemoryStorage();
+    }
+  }
+
+  function invoke(methodName, args, defaultValue) {
+    ensurePreferred();
+    if (!preferred) {
+      return defaultValue;
+    }
+    var method = preferred[methodName];
+    if (typeof method !== 'function') {
+      return defaultValue;
+    }
+    try {
+      return method.apply(preferred, args || []);
+    } catch (storageError) {
+      preferred = createMemoryStorage();
+      if (methodName === 'setItem' && args && args.length === 2) {
+        try {
+          preferred.setItem(args[0], args[1]);
+        } catch (memoryError) {
+        }
+      } else if (methodName === 'removeItem' && args && args.length === 1) {
+        try {
+          preferred.removeItem(args[0]);
+        } catch (removeError) {
+        }
+      } else if (methodName === 'clear') {
+        try {
+          preferred.clear();
+        } catch (clearError) {
+        }
+      }
+      return defaultValue;
+    }
+  }
+
+  return {
+    getItem: function(key) {
+      var value = invoke('getItem', [key], null);
+      return value === undefined ? null : value;
+    },
+    setItem: function(key, value) {
+      invoke('setItem', [key, value], undefined);
+    },
+    removeItem: function(key) {
+      invoke('removeItem', [key], undefined);
+    },
+    clear: function() {
+      invoke('clear', [], undefined);
+    }
+  };
 }
 
 function sanitizeFilename(name) {
