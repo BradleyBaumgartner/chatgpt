@@ -1,0 +1,2988 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="light">
+<head>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Wochenbericht</title>
+<hta:application id="WochenberichtApp" applicationname="Wochenbericht" border="thin" caption="yes" sysmenu="yes" showintaskbar="yes" windowstate="normal" />
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f6f9;
+    color: #233146;
+    margin: 0;
+    padding: 0;
+    padding-bottom: 100px;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    overflow-x: hidden;
+  }
+  header {
+    background-color: #0b62d4;
+    padding: 15px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+  }
+  header img {
+    height: 100px;
+    filter: brightness(0) invert(1);
+    object-fit: contain;
+    transition: filter 0.3s ease;
+  }
+  [data-theme="dark"] header {
+    background-color: #1a1a1a;
+  }
+  [data-theme="dark"] header img {
+    filter: brightness(1) invert(0);
+  }
+
+  .header-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .theme-toggle {
+    background: transparent;
+    border: 2px solid white;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.3s ease;
+  }
+  .theme-toggle:hover {
+    background-color: rgba(255,255,255,0.2);
+  }
+
+  .floating-nav {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 25px;
+    padding: 10px 15px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    z-index: 2000;
+    display: flex;
+    gap: 5px;
+    max-width: 90vw;
+    overflow-x: auto;
+  }
+
+  [data-theme="dark"] .floating-nav {
+    background: rgba(44, 44, 44, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 60px;
+    text-align: center;
+  }
+
+  .nav-item:hover {
+    background: rgba(11, 98, 212, 0.1);
+    transform: translateY(-2px);
+  }
+
+  .nav-item.active {
+    background: #0b62d4;
+    color: white;
+    transform: translateY(-2px);
+  }
+
+  [data-theme="dark"] .nav-item:hover {
+    background: rgba(122, 162, 255, 0.2);
+  }
+
+  [data-theme="dark"] .nav-item.active {
+    background: #7aa2ff;
+  }
+
+  .nav-icon {
+    font-size: 18px;
+    margin-bottom: 2px;
+  }
+
+  .nav-text {
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  main {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    transition: all 0.3s ease;
+  }
+
+  .page-section {
+    display: none;
+  }
+  .page-section.active {
+    display: block;
+  }
+
+  .section {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+
+  [data-theme="dark"] body {
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+  }
+  [data-theme="dark"] .section {
+    background: #2c2c2c;
+    color: #e0e0e0;
+    box-shadow: 0 2px 4px rgba(255,255,255,0.05);
+  }
+
+  .section h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 18px;
+    color: #0b62d4;
+    border-bottom: 2px solid #0b62d4;
+    padding-bottom: 8px;
+  }
+  [data-theme="dark"] .section h2 {
+    color: #7aa2ff;
+    border-bottom-color: #7aa2ff;
+  }
+
+  .welcome-card {
+    text-align: center;
+    padding: 40px 20px;
+  }
+  .welcome-card h1 {
+    color: #0b62d4;
+    margin-bottom: 10px;
+  }
+  [data-theme="dark"] .welcome-card h1 {
+    color: #7aa2ff;
+  }
+  .welcome-card p {
+    color: #666;
+    font-size: 16px;
+  }
+  [data-theme="dark"] .welcome-card p {
+    color: #ccc;
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+  }
+
+  .form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+  }
+
+  .form-row-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+  }
+
+  .form-full {
+    grid-column: 1 / -1;
+  }
+
+  label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    font-size: 14px;
+    color: #24313a;
+  }
+  [data-theme="dark"] label {
+    color: #e0e0e0;
+  }
+
+  input, select, textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e0e6ed;
+    border-radius: 6px;
+    font-size: 14px;
+    box-sizing: border-box;
+    background-color: white;
+    color: #233146;
+    transition: all 0.3s ease;
+    font-family: inherit;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: #0b62d4;
+    box-shadow: 0 0 0 3px rgba(11, 98, 212, 0.1);
+  }
+
+  [data-theme="dark"] input,
+  [data-theme="dark"] select,
+  [data-theme="dark"] textarea {
+    background-color: #444;
+    border: 2px solid #666;
+    color: #f0f0f0;
+  }
+
+  [data-theme="dark"] input:focus,
+  [data-theme="dark"] select:focus,
+  [data-theme="dark"] textarea:focus {
+    border-color: #7aa2ff;
+    box-shadow: 0 0 0 3px rgba(122, 162, 255, 0.1);
+  }
+
+  .input-short {
+    max-width: 200px;
+  }
+
+  .input-medium {
+    max-width: 300px;
+  }
+
+  .input-long {
+    min-width: 250px;
+  }
+
+  textarea {
+    min-height: 100px;
+    resize: vertical;
+  }
+
+  textarea.tall {
+    min-height: 150px;
+  }
+
+  .time-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 15px;
+    align-items: end;
+  }
+
+  .time-group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .time-group input {
+    max-width: none;
+  }
+
+  button {
+    background-color: #0b62d4;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    margin-top: 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    min-width: 120px;
+  }
+  button:hover {
+    background-color: #094a9a;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  }
+
+  .button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  .button-row button {
+    margin-top: 0;
+  }
+
+  .bulk-selection-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+  }
+
+  [data-theme="dark"] .bulk-selection-header {
+    background: #3a3a3a;
+    border-color: #555;
+  }
+
+  .bulk-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .select-all-checkbox {
+    margin-right: 10px;
+    transform: scale(1.2);
+    transform-origin: center;
+    display: inline-block;
+  }
+
+  .saved-reports-list {
+    max-height: 500px;
+    overflow-y: auto;
+  }
+
+  .report-item {
+    background: #f9fbfd;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    border: 1px solid #e6eef6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s ease;
+  }
+
+  .report-item.selected {
+    background: #e3f2fd;
+    border-color: #0b62d4;
+  }
+
+  [data-theme="dark"] .report-item {
+    background: #3a3a3a;
+    border-color: #555;
+  }
+
+  [data-theme="dark"] .report-item.selected {
+    background: #1e3a5f;
+    border-color: #7aa2ff;
+  }
+
+.report-checkbox {
+  width: 60px;
+  height: 16px;
+  margin-right: 8px;
+  transform: scale(1.2);
+  transform-origin: center;
+  display: inline-block;
+}
+
+
+  .report-content {
+    display: flex;
+    align-items: center;
+    flex: 1;
+  }
+
+  .report-info h4 {
+    margin: 0 0 5px 0;
+    color: #24313a;
+  }
+  .report-info span {
+    color: #666;
+    font-size: 13px;
+  }
+  [data-theme="dark"] .report-info h4 {
+    color: #f0f0f0;
+  }
+  [data-theme="dark"] .report-info span {
+    color: #ccc;
+  }
+  .report-actions {
+    display: flex;
+    gap: 5px;
+  }
+  .btn-small {
+    padding: 6px 12px;
+    font-size: 12px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    font-weight: 600;
+  }
+  .btn-view {
+    background: #0b62d4;
+    color: white;
+  }
+  .btn-view:hover {
+    background: #094a9a;
+  }
+  .btn-pdf {
+    background: #28a745;
+    color: white;
+  }
+  .btn-pdf:hover {
+    background: #218838;
+  }
+  .btn-delete {
+    background: #dc3545;
+    color: white;
+  }
+  .btn-delete:hover {
+    background: #c82333;
+  }
+
+  .filter-section {
+    margin-bottom: 20px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+  }
+
+  [data-theme="dark"] .filter-section {
+    background: #2a2a2a;
+    border-color: #555;
+  }
+
+  .filter-section h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #0b62d4;
+    font-size: 16px;
+  }
+
+  [data-theme="dark"] .filter-section h3 {
+    color: #7aa2ff;
+  }
+  .week-navigation {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+  }
+
+  [data-theme="dark"] .week-navigation {
+    background: #3a3a3a;
+    border-color: #555;
+  }
+
+  .week-navigation button {
+    margin-top: 0;
+    padding: 8px 16px;
+    min-width: auto;
+  }
+
+  .week-navigation span {
+    font-weight: 600;
+    font-size: 16px;
+  }
+
+  .entry-item {
+    background: #f9fbfd;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    border: 1px solid #e6eef6;
+    position: relative;
+  }
+
+  [data-theme="dark"] .entry-item {
+    background: #3a3a3a;
+    border-color: #555;
+  }
+  [data-theme="dark"] .entry-name,
+  [data-theme="dark"] .entry-time,
+  [data-theme="dark"] .entry-description {
+    color: #f0f0f0;
+  }
+  [data-theme="dark"] .entry-delete-btn,
+  [data-theme="dark"] .entry-edit-btn {
+    color: #ff7777;
+  }
+
+  .entry-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 15px;
+    margin-bottom: 10px;
+  }
+  .entry-name {
+    font-weight: 700;
+    color: #24313a;
+    font-size: 16px;
+  }
+  .entry-time {
+    color: #2f4b5d;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .entry-description {
+    color: #495b66;
+    white-space: pre-wrap;
+    line-height: 1.5;
+  }
+  .entry-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .entry-delete-btn, .entry-edit-btn {
+    background: transparent;
+    border: none;
+    font-weight: 700;
+    font-size: 16px;
+    cursor: pointer;
+    color: #666;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+  }
+  .entry-edit-btn {
+    color: #0b62d4;
+  }
+  .entry-delete-btn:hover {
+    color: #cc0000;
+    background: rgba(204, 0, 0, 0.1);
+  }
+  .entry-edit-btn:hover {
+    color: #094a9a;
+    background: rgba(11, 98, 212, 0.1);
+  }
+
+  .email-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .email-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+  }
+
+  .email-subject {
+    grid-column: 1 / -1;
+  }
+
+  .email-body {
+    grid-column: 1 / -1;
+  }
+
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 3000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+  }
+  .modal-content {
+    background: white;
+    margin: 5% auto;
+    padding: 30px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 600px;
+    position: relative;
+  }
+  [data-theme="dark"] .modal-content {
+    background: #2c2c2c;
+    color: #e0e0e0;
+  }
+  .close-modal {
+    position: absolute;
+    right: 15px;
+    top: 15px;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+  }
+  .close-modal:hover {
+    color: #000;
+  }
+  [data-theme="dark"] .close-modal:hover {
+    color: #fff;
+  }
+
+  .no-entries-message {
+    color: #66788a;
+    padding: 20px;
+    text-align: center;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px dashed #dee2e6;
+  }
+
+  [data-theme="dark"] .no-entries-message {
+    color: #aaa;
+    background: #3a3a3a;
+    border-color: #555;
+  }
+
+  @media (max-width: 768px) {
+    header {
+      flex-direction: column;
+      gap: 10px;
+      text-align: center;
+    }
+    header img { height: 70px; }
+
+    .form-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .form-row,
+    .form-row-2,
+    .form-row-3 {
+      grid-template-columns: 1fr;
+    }
+
+    .time-inputs {
+      grid-template-columns: 1fr;
+    }
+
+    .email-fields {
+      grid-template-columns: 1fr;
+    }
+
+    .info-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .button-row {
+      flex-direction: column;
+    }
+
+    .button-row button {
+      width: 100%;
+    }
+
+    .week-navigation {
+      flex-direction: column;
+      gap: 10px;
+      text-align: center;
+    }
+
+    .week-navigation button {
+      width: 100%;
+    }
+
+    .entry-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .entry-actions {
+      align-self: flex-end;
+      margin-top: -25px;
+    }
+
+    .floating-nav {
+      bottom: 10px;
+      left: 10px;
+      right: 10px;
+      transform: none;
+      max-width: none;
+    }
+
+    .nav-text {
+      font-size: 9px;
+    }
+
+    .bulk-actions {
+      flex-direction: column;
+      gap: 8px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    main {
+      padding: 10px;
+    }
+
+    .section {
+      padding: 15px;
+    }
+
+    .modal-content {
+      margin: 10% auto;
+      padding: 20px;
+    }
+
+    .nav-text {
+      display: none;
+    }
+
+    .nav-item {
+      min-width: 45px;
+      padding: 8px;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="floating-nav">
+    <div class="nav-item active" onclick="showPage('home')" data-page="home">
+      <div class="nav-icon">🏠</div>
+      <div class="nav-text">Home</div>
+    </div>
+    <div class="nav-item" onclick="showPage('create')" data-page="create">
+      <div class="nav-icon">📝</div>
+      <div class="nav-text">Erstellen</div>
+    </div>
+    <div class="nav-item" onclick="showPage('saved')" data-page="saved">
+      <div class="nav-icon">📋</div>
+      <div class="nav-text">Berichte</div>
+    </div>
+    <div class="nav-item" onclick="showPage('backup')" data-page="backup">
+      <div class="nav-icon">💾</div>
+      <div class="nav-text">Backup</div>
+    </div>
+    <div class="nav-item" onclick="showPage('info')" data-page="info">
+      <div class="nav-icon">ℹ️</div>
+      <div class="nav-text">Info</div>
+    </div>
+  </div>
+
+  <header>
+    <img src="https://clipground.com/images/atos-logo-png-7.png" alt="Logo" onclick="showPage('home')" style="cursor: pointer;" title="Zur Startseite" />
+    <div class="header-controls">
+      <button class="theme-toggle" onclick="toggleTheme()">🌙 Dark</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-section active" id="homePage">
+      <div class="section welcome-card">
+        <h1>Willkommen beim Wochenbericht-Tool</h1>
+        <p>Verwalten Sie Ihre wöchentlichen Arbeitsberichte einfach und effizient.</p>
+        <button onclick="showPage('create')" style="margin-top: 20px; padding: 15px 30px; font-size: 16px;">
+          Neuen Bericht erstellen
+        </button>
+      </div>
+
+      <div class="info-grid">
+        <div class="section">
+          <h2> Schnellübersicht</h2>
+          <p><strong>Aktuelle Woche:</strong> <span id="currentWeekInfo"></span></p>
+          <p><strong>Gespeicherte Berichte:</strong> <span id="savedReportsCount">0</span></p>
+          <p><strong>Diese Woche:</strong> <span id="thisWeekEntries">0 Einträge</span></p>
+        </div>
+
+        <div class="section">
+          <h2> Schnellaktionen</h2>
+          <div class="button-row">
+            <button onclick="showPage('create')">Neuer Eintrag</button>
+            <button onclick="showPage('saved')">Berichte anzeigen</button>
+            <button onclick="downloadCurrentWeekPDF()">Diese Woche als PDF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-section" id="createPage">
+      <div class="section">
+        <h2> Persönliche Daten</h2>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="name">Name</label>
+            <input id="name" type="text" class="input-medium" placeholder="Ihr vollständiger Name" />
+          </div>
+          <div class="form-group">
+            <label for="position">Ausbilder/in</label>
+            <input id="position" type="text" class="input-medium" placeholder="Name des Ausbilders" />
+          </div>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="specialist">Fachkraft</label>
+            <input id="specialist" type="text" class="input-medium" placeholder="Name der Fachkraft" />
+          </div>
+          <div class="form-group">
+            <label for="department">Dienstort</label>
+            <input id="department" type="text" class="input-medium" placeholder="Ihr Arbeitsplatz/Abteilung" />
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2> Neuer Eintrag</h2>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="workday">Wochentag</label>
+            <select id="workday">
+              <option value="Montag">Montag</option>
+              <option value="Dienstag">Dienstag</option>
+              <option value="Mittwoch">Mittwoch</option>
+              <option value="Donnerstag">Donnerstag</option>
+              <option value="Freitag">Freitag</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="breakTime">Pausen (Minuten)</label>
+            <input id="breakTime" type="number" min="0" value="30" class="input-short" />
+          </div>
+        </div>
+
+        <div class="form-group form-full">
+          <label for="activity">Tätigkeitsbeschreibung</label>
+          <textarea id="activity" class="tall" placeholder="Beschreiben Sie detailliert Ihre Tätigkeiten für diesen Tag..."></textarea>
+        </div>
+
+        <div class="time-inputs">
+          <div class="time-group">
+            <label for="startTime">Arbeitsbeginn</label>
+            <input id="startTime" type="time" value="08:00" />
+          </div>
+          <div class="time-group">
+            <label for="endTime">Arbeitsende</label>
+            <input id="endTime" type="time" value="16:00" />
+          </div>
+          <div class="time-group">
+            <label>&nbsp;</label>
+            <button onclick="addEntry()" style="width: 100%; margin-top: 0;">Eintrag speichern</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="week-navigation">
+          <button onclick="changeWeek(-1)">← Vorherige Woche</button>
+          <span id="weekDisplay"></span>
+          <button onclick="changeWeek(1)">Nächste Woche →</button>
+        </div>
+        <h2> Einträge dieser Woche</h2>
+        <div id="entries"></div>
+        <div class="button-row">
+          <button onclick="downloadPDF()"> Als PDF herunterladen</button>
+          <button onclick="clearAllData()" style="background:#dc3545"> Alles löschen</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="email-header">
+          <h2> E-Mail versenden</h2>
+          <button onclick="fillExampleEmail()"> Beispiel hinzufügen</button>
+        </div>
+        <div class="email-fields">
+          <div class="form-group">
+            <label for="emailTo">An</label>
+            <input id="emailTo" type="email" placeholder="empfaenger@domain.com" />
+          </div>
+          <div class="form-group">
+            <label for="emailCc">CC</label>
+            <input id="emailCc" type="email" placeholder="cc@domain.com (optional)" />
+          </div>
+        </div>
+        <div class="form-group email-subject">
+          <label for="emailSubject">Betreff</label>
+          <input id="emailSubject" type="text" placeholder="Betreff der E-Mail" />
+        </div>
+        <div class="form-group email-body">
+          <label for="emailBody">Nachrichtentext</label>
+          <textarea id="emailBody" rows="6" placeholder="Sehr geehrte Damen und Herren,
+
+anbei finden Sie meinen Wochenbericht...
+
+Mit freundlichen Grüßen"></textarea>
+        </div>
+        <div class="button-row">
+          <button onclick="sendEmail()"> E-Mail senden</button>
+        </div>
+      </div>
+    </div>
+    <div class="page-section" id="savedPage">
+      <div class="section">
+        <div class="filter-section">
+          <h3> Filter &amp; Suche</h3>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="searchInput">Suche in Berichten</label>
+              <input id="searchInput" type="text" placeholder="Suche nach Tätigkeiten, Wochen, etc..." oninput="filterReports()" />
+            </div>
+            <div class="form-group">
+              <label for="yearFilter">Jahr filtern</label>
+              <select id="yearFilter" onchange="filterReports()">
+                <option value="">Alle Jahre</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row-3">
+            <div class="form-group">
+              <label for="minHours">Min. Stunden pro Woche</label>
+              <input id="minHours" type="number" min="0" step="0.1" placeholder="z.B. 35" oninput="filterReports()" />
+            </div>
+            <div class="form-group">
+              <label for="maxHours">Max. Stunden pro Woche</label>
+              <input id="maxHours" type="number" min="0" step="0.1" placeholder="z.B. 45" oninput="filterReports()" />
+            </div>
+            <div class="form-group">
+              <label for="sortBy">Sortieren nach</label>
+              <select id="sortBy" onchange="filterReports()">
+                <option value="week-desc">Neueste Woche zuerst</option>
+                <option value="week-asc">Älteste Woche zuerst</option>
+                <option value="hours-desc">Meiste Stunden zuerst</option>
+                <option value="hours-asc">Wenigste Stunden zuerst</option>
+              </select>
+            </div>
+          </div>
+          <div class="button-row">
+            <button onclick="clearFilters()" style="background: #6c757d;"> Filter zurücksetzen</button>
+            <button onclick="exportFilteredData()"> Gefilterte Daten exportieren</button>
+          </div>
+          <div id="filterResults" style="margin-top: 15px; font-weight: bold; color: #0b62d4;"></div>
+        </div>
+
+        <h2> Gespeicherte Wochenberichte</h2>
+
+        <div class="bulk-selection-header">
+          <div class="bulk-actions">
+            <input type="checkbox" id="selectAllCheckbox" class="select-all-checkbox" onchange="toggleSelectAll()" />
+            <label for="selectAllCheckbox">Alle auswählen</label>
+          </div>
+          <div class="bulk-actions">
+            <button onclick="downloadSelectedPDFs()"> Ausgewählte als PDF</button>
+            <button onclick="exportSelectedReports()"> Ausgewählte exportieren</button>
+            <button onclick="deleteSelectedReports()" style="background: #dc3545;"> Ausgewählte löschen</button>
+          </div>
+        </div>
+
+        <div id="savedReportsList" class="saved-reports-list">
+        </div>
+      </div>
+    </div>
+
+    <div class="page-section" id="backupPage">
+      <div class="section">
+        <h2> Daten Exportieren</h2>
+        <p>Erstellen Sie ein Backup aller Ihrer Daten (Wochenberichte und persönliche Informationen).</p>
+        <div class="button-row">
+          <button onclick="exportAllData()"> Alle Daten exportieren</button>
+          <button onclick="exportPersonalDataOnly()"> Nur persönliche Daten exportieren</button>
+          <button onclick="exportReportsOnly()"> Nur Wochenberichte exportieren</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2> Daten Importieren</h2>
+        <p>Importieren Sie ein zuvor erstelltes Backup. <strong>Achtung:</strong> Dies überschreibt alle aktuellen Daten!</p>
+        <div class="form-group">
+          <label for="importFile">Backup-Datei auswählen</label>
+          <input id="importFile" type="file" accept=".json" style="margin-top: 0;" />
+        </div>
+        <div class="button-row">
+          <button onclick="importData()"> Daten importieren</button>
+          <button onclick="importDataMerge()"> Daten zusammenführen</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2> Daten-Übersicht</h2>
+        <div class="info-grid">
+          <div class="section">
+            <h3> Statistiken</h3>
+            <div id="dataStats">
+              <p><strong>Gesamte Einträge:</strong> <span id="totalEntries">0</span></p>
+              <p><strong>Anzahl gespeicherter Wochenberichte:</strong> <span id="totalWeekReports">0</span></p>
+              <p><strong>Gesamte Arbeitsstunden:</strong> <span id="totalHours">0</span> h</p>
+              <p><strong>Durchschnittliche Stunden pro Woche:</strong> <span id="avgHoursPerWeek">0</span> h</p>
+              <p><strong>Letzte bearbeitete Woche:</strong> <span id="lastEditedWeek">Keine</span></p>
+              <p><strong>Letztes Backup:</strong> <span id="lastBackup">Nie</span></p>
+            </div>
+          </div>
+
+          <div class="section">
+            <h3> Datenspeicher</h3>
+            <div class="button-row">
+              <button onclick="showDataDetails()" style="">Details anzeigen</button>
+              <button onclick="clearAllDataConfirm()" style="background: #dc3545;">Alle Daten löschen</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section" id="dataDetailsSection" style="display: none;">
+        <h2>📋 Detaillierte Datenübersicht</h2>
+        <div id="filteredDataCount" style="margin-bottom: 15px; font-weight: bold;"></div>
+        <div id="dataDetailsList"></div>
+        <div class="button-row">
+          <button onclick="hideDataDetails()" style="background: #6c757d;">Details ausblenden</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-section" id="infoPage">
+      <div class="section">
+        <h2> Information</h2>
+        <h3>Über das Wochenbericht-Tool</h3>
+        <p>Dieses Tool wurde entwickelt, um die Erstellung und Verwaltung von wöchentlichen Arbeitsberichten zu vereinfachen.</p>
+
+        <h3>Features:</h3>
+        <ul>
+          <li> Einfache Erfassung von täglichen Arbeitszeiten</li>
+          <li> Automatische Berechnung der Arbeitsstunden</li>
+          <li> PDF-Export für jeden Wochenbericht</li>
+          <li> Lokale Speicherung aller Daten</li>
+          <li> E-Mail-Versand direkt aus der App</li>
+          <li> Dark Mode Unterstützung</li>
+          <li> Responsive Design für alle Geräte</li>
+          <li> Mehrfachauswahl für Batch-Downloads</li>
+        </ul>
+
+        <h3>Verwendung:</h3>
+        <p>1. Füllen Sie zunächst Ihre persönlichen Daten aus</p>
+        <p>2. Fügen Sie für jeden Arbeitstag einen Eintrag hinzu</p>
+        <p>3. Nutzen Sie die Filter- und Suchfunktionen in den gespeicherten Berichten</p>
+        <p>4. Wählen Sie mehrere Berichte aus für Batch-Downloads</p>
+        <p>5. Exportieren Sie Berichte als PDF oder JSON</p>
+
+        <h3>Datenschutz:</h3>
+        <p>Alle Daten werden ausschließlich lokal im Browser gespeichert – direkt über die HTML-Datei. Es findet keine Übertragung an externe Server statt.</p>
+
+      </div>
+    </div>
+  </main>
+  <div id="editModal" class="modal">
+    <div class="modal-content">
+      <span class="close-modal" onclick="closeEditModal()">&times;</span>
+      <h2>Eintrag bearbeiten</h2>
+      <div class="form-row-2">
+        <div class="form-group">
+          <label for="editWorkday">Wochentag</label>
+          <select id="editWorkday">
+            <option value="Montag">Montag</option>
+            <option value="Dienstag">Dienstag</option>
+            <option value="Mittwoch">Mittwoch</option>
+            <option value="Donnerstag">Donnerstag</option>
+            <option value="Freitag">Freitag</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="editBreakTime">Pausen (Minuten)</label>
+          <input id="editBreakTime" type="number" min="0" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="editActivity">Tätigkeitsbeschreibung</label>
+        <textarea id="editActivity" class="tall"></textarea>
+      </div>
+      <div class="time-inputs">
+        <div class="time-group">
+          <label for="editStartTime">Arbeitsbeginn</label>
+          <input id="editStartTime" type="time" />
+        </div>
+        <div class="time-group">
+          <label for="editEndTime">Arbeitsende</label>
+          <input id="editEndTime" type="time" />
+        </div>
+        <div class="time-group"></div>
+      </div>
+      <div class="button-row">
+        <button onclick="saveEdit()">Änderungen speichern</button>
+        <button onclick="closeEditModal()" style="background:#6c757d;">❌Abbrechen</button>
+      </div>
+    </div>
+  </div>
+<script>
+var fileSystemHelper = createFileSystemHelper();
+var localStorage = createSafeStorage();
+var selectedReportsStore = {};
+var filteredEntries = [];
+var editingEntryId = null;
+var entries = [];
+var currentWeek = 0;
+var currentYear = 0;
+var dayOrder = {
+  "Montag": 1,
+  "Dienstag": 2,
+  "Mittwoch": 3,
+  "Donnerstag": 4,
+  "Freitag": 5
+};
+
+function getWeekEntriesSorted(weekNumber, yearNumber) {
+  var weekEntries = entries.filter(function(e) {
+    return String(e.week) === String(weekNumber) && String(e.year) === String(yearNumber);
+  });
+  weekEntries.sort(function(a, b) {
+    var orderA = dayOrder[a.workday] || 0;
+    var orderB = dayOrder[b.workday] || 0;
+    if (orderA === orderB) {
+      return (a.startTime || '').localeCompare(b.startTime || '');
+    }
+    return orderA - orderB;
+  });
+  return weekEntries;
+}
+
+function createFileSystemHelper() {
+  try {
+    var fso = new ActiveXObject('Scripting.FileSystemObject');
+    var shell = new ActiveXObject('WScript.Shell');
+    var baseFolder = null;
+
+    function ensureBaseFolder() {
+      if (baseFolder) {
+        return baseFolder;
+      }
+      var documents = null;
+      try {
+        documents = shell.SpecialFolders('MyDocuments');
+      } catch (specialFoldersError) {
+        documents = null;
+      }
+      if (!documents || documents === '') {
+        try {
+          documents = shell.ExpandEnvironmentStrings('%USERPROFILE%\\Documents');
+        } catch (userProfileError) {
+          documents = null;
+        }
+      }
+      if (!documents || documents === '') {
+        try {
+          documents = shell.ExpandEnvironmentStrings('%TEMP%');
+        } catch (tempError) {
+          documents = null;
+        }
+      }
+      if (!documents || documents === '') {
+        return null;
+      }
+      var folder = fso.BuildPath(documents, 'Wochenbericht-HTA');
+      if (!fso.FolderExists(folder)) {
+        fso.CreateFolder(folder);
+      }
+      baseFolder = folder;
+      return baseFolder;
+    }
+
+    function writeText(fullPath, content, charset) {
+      var stream = new ActiveXObject('ADODB.Stream');
+      stream.Type = 2;
+      stream.Charset = charset || 'utf-8';
+      stream.Open();
+      stream.WriteText(content);
+      stream.SaveToFile(fullPath, 2);
+      stream.Close();
+    }
+
+    function readText(fullPath, charset) {
+      if (!fso.FileExists(fullPath)) {
+        return '';
+      }
+      var stream = new ActiveXObject('ADODB.Stream');
+      stream.Type = 2;
+      stream.Charset = charset || 'utf-8';
+      stream.Open();
+      stream.LoadFromFile(fullPath);
+      var text = stream.ReadText();
+      stream.Close();
+      return text;
+    }
+
+    return {
+      getBaseFolder: ensureBaseFolder,
+      saveTextFile: function(filename, content) {
+        var folder = ensureBaseFolder();
+        if (!folder) {
+          return null;
+        }
+        var safeName = sanitizeFilename(filename || 'export.txt');
+        var fullPath = fso.BuildPath(folder, safeName);
+        writeText(fullPath, content, 'utf-8');
+        return fullPath;
+      },
+      saveBinaryFile: function(filename, content) {
+        var folder = ensureBaseFolder();
+        if (!folder) {
+          return null;
+        }
+        var safeName = sanitizeFilename(filename || 'export.pdf');
+        var fullPath = fso.BuildPath(folder, safeName);
+        writeText(fullPath, content, 'windows-1252');
+        return fullPath;
+      },
+      readTextFile: function(path) {
+        try {
+          return readText(path, 'utf-8');
+        } catch (readError) {
+          return '';
+        }
+      },
+      writeTextFile: function(path, content) {
+        try {
+          writeText(path, content, 'utf-8');
+        } catch (writeError) {
+        }
+      },
+      getStorageFilePath: function() {
+        var folder = ensureBaseFolder();
+        if (!folder) {
+          return null;
+        }
+        return fso.BuildPath(folder, 'storage.json');
+      }
+    };
+  } catch (helperError) {
+    return null;
+  }
+}
+
+function createMemoryStorage() {
+  var cache = {};
+  var storage = {};
+
+  function updateLength() {
+    var count = 0;
+    var key;
+    for (key in cache) {
+      if (cache.hasOwnProperty(key)) {
+        count += 1;
+      }
+    }
+    storage.length = count;
+  }
+
+  storage.getItem = function(key) {
+    return cache.hasOwnProperty(key) ? cache[key] : null;
+  };
+
+  storage.setItem = function(key, value) {
+    cache[key] = String(value);
+    updateLength();
+  };
+
+  storage.removeItem = function(key) {
+    if (cache.hasOwnProperty(key)) {
+      delete cache[key];
+      updateLength();
+    }
+  };
+
+  storage.clear = function() {
+    cache = {};
+    updateLength();
+  };
+
+  storage.key = function(index) {
+    var keys = [];
+    var key;
+    for (key in cache) {
+      if (cache.hasOwnProperty(key)) {
+        keys.push(key);
+      }
+    }
+    if (index >= 0 && index < keys.length) {
+      return keys[index];
+    }
+    return null;
+  };
+
+  updateLength();
+  return storage;
+}
+
+function createFileStorage() {
+  if (!fileSystemHelper) {
+    return createMemoryStorage();
+  }
+  var storagePath = fileSystemHelper.getStorageFilePath();
+  if (!storagePath) {
+    return createMemoryStorage();
+  }
+  var cache = {};
+  try {
+    var existing = fileSystemHelper.readTextFile(storagePath);
+    if (existing) {
+      cache = JSON.parse(existing);
+    }
+  } catch (parseError) {
+    cache = {};
+  }
+  var storage = {};
+
+  function persist() {
+    try {
+      fileSystemHelper.writeTextFile(storagePath, JSON.stringify(cache));
+    } catch (persistError) {
+    }
+    updateLength();
+  }
+
+  function updateLength() {
+    var count = 0;
+    var key;
+    for (key in cache) {
+      if (cache.hasOwnProperty(key)) {
+        count += 1;
+      }
+    }
+    storage.length = count;
+  }
+
+  storage.getItem = function(key) {
+    return cache.hasOwnProperty(key) ? cache[key] : null;
+  };
+
+  storage.setItem = function(key, value) {
+    cache[key] = String(value);
+    persist();
+  };
+
+  storage.removeItem = function(key) {
+    if (cache.hasOwnProperty(key)) {
+      delete cache[key];
+      persist();
+    }
+  };
+
+  storage.clear = function() {
+    cache = {};
+    persist();
+  };
+
+  storage.key = function(index) {
+    var keys = [];
+    var key;
+    for (key in cache) {
+      if (cache.hasOwnProperty(key)) {
+        keys.push(key);
+      }
+    }
+    if (index >= 0 && index < keys.length) {
+      return keys[index];
+    }
+    return null;
+  };
+
+  updateLength();
+  return storage;
+}
+
+function createSafeStorage() {
+  var preferred = null;
+
+  function ensurePreferred() {
+    if (preferred && typeof preferred.getItem === 'function' && typeof preferred.setItem === 'function') {
+      return;
+    }
+    try {
+      preferred = createFileStorage();
+    } catch (fileStorageError) {
+      preferred = null;
+    }
+    if (!preferred || typeof preferred.getItem !== 'function' || typeof preferred.setItem !== 'function') {
+      preferred = createMemoryStorage();
+    }
+  }
+
+  function invoke(methodName, args, defaultValue) {
+    ensurePreferred();
+    if (!preferred) {
+      return defaultValue;
+    }
+    var method = preferred[methodName];
+    if (typeof method !== 'function') {
+      return defaultValue;
+    }
+    try {
+      return method.apply(preferred, args || []);
+    } catch (storageError) {
+      preferred = createMemoryStorage();
+      if (methodName === 'setItem' && args && args.length === 2) {
+        try {
+          preferred.setItem(args[0], args[1]);
+        } catch (memoryError) {
+        }
+      } else if (methodName === 'removeItem' && args && args.length === 1) {
+        try {
+          preferred.removeItem(args[0]);
+        } catch (removeError) {
+        }
+      } else if (methodName === 'clear') {
+        try {
+          preferred.clear();
+        } catch (clearError) {
+        }
+      }
+      return defaultValue;
+    }
+  }
+
+  return {
+    getItem: function(key) {
+      var value = invoke('getItem', [key], null);
+      return value === undefined ? null : value;
+    },
+    setItem: function(key, value) {
+      invoke('setItem', [key, value], undefined);
+    },
+    removeItem: function(key) {
+      invoke('removeItem', [key], undefined);
+    },
+    clear: function() {
+      invoke('clear', [], undefined);
+    }
+  };
+}
+
+function sanitizeFilename(name) {
+  var base = String(name || 'datei');
+  return base.replace(/[\\\/\:*?"<>|]/g, '_');
+}
+
+function padNumber(value) {
+  return value < 10 ? '0' + value : String(value);
+}
+
+function formatDateISO(date) {
+  return date.getFullYear() + '-' + padNumber(date.getMonth() + 1) + '-' + padNumber(date.getDate());
+}
+
+function formatDateTimeISO(date) {
+  return formatDateISO(date) + 'T' + padNumber(date.getHours()) + ':' + padNumber(date.getMinutes()) + ':' + padNumber(date.getSeconds());
+}
+
+function formatGermanDate(date) {
+  return padNumber(date.getDate()) + '.' + padNumber(date.getMonth() + 1) + '.' + date.getFullYear();
+}
+
+function formatGermanDateTime(date) {
+  return formatGermanDate(date) + ' ' + padNumber(date.getHours()) + ':' + padNumber(date.getMinutes()) + ':' + padNumber(date.getSeconds());
+}
+
+function wrapTextByLength(text, maxChars) {
+  var output = [];
+  if (typeof text !== 'string') {
+    text = text === undefined || text === null ? '' : String(text);
+  }
+  var normalized = text.replace(/\r/g, '');
+  var paragraphs = normalized.split('\n');
+  for (var p = 0; p < paragraphs.length; p++) {
+    var paragraph = paragraphs[p];
+    if (paragraph === '') {
+      output.push('');
+      continue;
+    }
+    var words = paragraph.split(/\s+/);
+    var currentLine = '';
+    for (var w = 0; w < words.length; w++) {
+      var word = words[w];
+      if (currentLine.length === 0) {
+        currentLine = word;
+      } else if ((currentLine + ' ' + word).length <= maxChars) {
+        currentLine += ' ' + word;
+      } else {
+        output.push(currentLine);
+        currentLine = word;
+      }
+    }
+    if (currentLine.length > 0) {
+      output.push(currentLine);
+    }
+  }
+  if (output.length === 0) {
+    output.push('');
+  }
+  return output;
+}
+
+function escapePdfText(text) {
+  var safe = text.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+  return safe;
+}
+
+function formatPdfNumber(value) {
+  var num = Math.round(Number(value) * 100) / 100;
+  if (!isFinite(num)) {
+    num = 0;
+  }
+  var str = num.toFixed(2);
+  while (str.length > 0 && str.indexOf('.') !== -1 && str.charAt(str.length - 1) === '0') {
+    str = str.substring(0, str.length - 1);
+  }
+  if (str.charAt(str.length - 1) === '.') {
+    str = str.substring(0, str.length - 1);
+  }
+  return str;
+}
+
+function createWeekPages(week, year, personal, weekEntries) {
+  var pages = [];
+  var currentPage = null;
+  var currentY = 0;
+
+  function startPage(isContinuation) {
+    currentPage = [];
+    pages.push(currentPage);
+    currentY = 780;
+    var title = isContinuation ? 'Wochenbericht (Fortsetzung)' : 'Wochenbericht';
+    addLine(title, 18, 60);
+    addLine('Kalenderwoche: ' + week + ', ' + year, 12, 50);
+    addLine('Datum: ' + formatGermanDate(new Date()), 11, 50);
+    addLine('Name: ' + (personal.name || '-'), 11, 50);
+    addLine('Ausbilder/in: ' + (personal.position || '-'), 11, 50);
+    addLine('Fachkraft: ' + (personal.specialist || '-'), 11, 50);
+    addLine('Dienstort: ' + (personal.department || '-'), 11, 50);
+    addSpacer(6);
+    addLine('Einträge dieser Woche', 13, 50);
+    addSpacer(4);
+  }
+
+  function ensureSpace(required) {
+    if (currentY - required < 60) {
+      startPage(true);
+    }
+  }
+
+  function addSpacer(amount) {
+    currentY -= amount;
+  }
+
+  function addLine(text, size, x) {
+    if (currentPage === null) {
+      startPage(false);
+    }
+    currentPage.push({
+      text: text,
+      size: size || 11,
+      x: x || 50,
+      y: currentY
+    });
+    currentY -= size >= 16 ? 22 : 14;
+  }
+
+  startPage(false);
+
+  var totalHours = 0;
+  if (!weekEntries || weekEntries.length === 0) {
+    ensureSpace(30);
+    addLine('Keine Einträge für diese Woche.', 11, 50);
+  } else {
+    for (var i = 0; i < weekEntries.length; i++) {
+      var entry = weekEntries[i];
+      var hoursValue = parseFloat(entry.hours || '0');
+      if (!isFinite(hoursValue)) {
+        hoursValue = 0;
+      }
+      totalHours += hoursValue;
+      ensureSpace(40);
+      var header = entry.workday + ' • ' + entry.startTime + ' - ' + entry.endTime + ' (' + hoursValue.toFixed(2) + 'h)';
+      addLine(header, 11, 50);
+      var wrapped = wrapTextByLength(entry.activity || '-', 95);
+      for (var j = 0; j < wrapped.length; j++) {
+        ensureSpace(18);
+        addLine('   ' + wrapped[j], 10, 60);
+      }
+      addSpacer(6);
+    }
+  }
+
+  ensureSpace(60);
+  addLine('Gesamtstunden (Woche): ' + totalHours.toFixed(2) + 'h', 11, 50);
+  addSpacer(10);
+  addLine('__________________________', 11, 50);
+  addLine('Unterschrift Ausbilder/in', 10, 50);
+
+  return pages;
+}
+
+function buildPdfFromPages(pages) {
+  var totalPages = pages.length;
+  if (totalPages === 0) {
+    pages = [[{ text: 'Keine Daten vorhanden.', size: 12, x: 50, y: 780 }]];
+    totalPages = 1;
+  }
+  var header = '%PDF-1.4\n';
+  var body = '';
+  var offsets = [];
+  var fontObjectId = 3 + totalPages * 2;
+
+  function appendObject(id, content) {
+    offsets[id] = header.length + body.length;
+    body += id + ' 0 obj\n' + content + '\nendobj\n';
+  }
+
+  appendObject(1, '<< /Type /Catalog /Pages 2 0 R >>');
+
+  var kids = [];
+  var pageIndex;
+  for (pageIndex = 0; pageIndex < totalPages; pageIndex++) {
+    kids.push((4 + pageIndex * 2) + ' 0 R');
+  }
+  appendObject(2, '<< /Type /Pages /Kids [' + kids.join(' ') + '] /Count ' + totalPages + ' >>');
+
+  for (pageIndex = 0; pageIndex < totalPages; pageIndex++) {
+    var pageLines = pages[pageIndex];
+    var commands = ['BT'];
+    for (var lineIndex = 0; lineIndex < pageLines.length; lineIndex++) {
+      var line = pageLines[lineIndex];
+      commands.push('1 0 0 1 ' + formatPdfNumber(line.x || 50) + ' ' + formatPdfNumber(line.y || 780) + ' Tm');
+      commands.push('/F1 ' + formatPdfNumber(line.size || 11) + ' Tf');
+      commands.push('(' + escapePdfText(line.text || '') + ') Tj');
+    }
+    commands.push('ET');
+    var stream = commands.join('\n');
+    var contentId = 3 + pageIndex * 2;
+    var content = '<< /Length ' + stream.length + ' >>\nstream\n' + stream + '\nendstream';
+    appendObject(contentId, content);
+    var pageId = 4 + pageIndex * 2;
+    var pageObject = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents ' + contentId + ' 0 R /Resources << /Font << /F1 ' + fontObjectId + ' 0 R >> >> >>';
+    appendObject(pageId, pageObject);
+  }
+
+  appendObject(fontObjectId, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+
+  var xrefStart = header.length + body.length;
+  var xref = 'xref\n0 ' + (fontObjectId + 1) + '\n0000000000 65535 f \n';
+  for (var id = 1; id <= fontObjectId; id++) {
+    var offset = offsets[id] || 0;
+    var padded = ('0000000000' + offset).slice(-10);
+    xref += padded + ' 00000 n \n';
+  }
+  var trailer = 'trailer << /Size ' + (fontObjectId + 1) + ' /Root 1 0 R >>\nstartxref\n' + xrefStart + '\n%%EOF';
+  return header + body + xref + trailer;
+}
+
+function savePdfDocument(filename, pages) {
+  var pdfData = buildPdfFromPages(pages);
+  if (fileSystemHelper) {
+    var savedPath = fileSystemHelper.saveBinaryFile(filename, pdfData);
+    if (savedPath) {
+      alert('PDF gespeichert unter:\n' + savedPath);
+    } else {
+      alert('PDF konnte nicht gespeichert werden.');
+    }
+  } else {
+    alert('PDF-Export wird in dieser Umgebung nicht unterstützt.');
+  }
+}
+
+function forEachNodeList(list, callback) {
+  for (var i = 0; i < list.length; i++) {
+    callback(list[i], i);
+  }
+}
+
+function findAncestorByClass(element, className) {
+  var el = element;
+  while (el && el !== document) {
+    if (el.classList && el.classList.contains(className)) {
+      return el;
+    }
+    el = el.parentNode;
+  }
+  return null;
+}
+
+function clearSelectedReports() {
+  selectedReportsStore = {};
+}
+
+function addSelectedReport(key) {
+  selectedReportsStore[key] = true;
+}
+
+function removeSelectedReport(key) {
+  if (selectedReportsStore.hasOwnProperty(key)) {
+    delete selectedReportsStore[key];
+  }
+}
+
+function getSelectedReportsArray() {
+  var arr = [];
+  for (var key in selectedReportsStore) {
+    if (selectedReportsStore.hasOwnProperty(key)) {
+      arr.push(key);
+    }
+  }
+  return arr;
+}
+
+function getSelectedCount() {
+  var count = 0;
+  for (var key in selectedReportsStore) {
+    if (selectedReportsStore.hasOwnProperty(key)) {
+      count++;
+    }
+  }
+  return count;
+}
+
+function getCurrentWeekNumber() {
+  var now = new Date();
+  var start = new Date(now.getFullYear(), 0, 1);
+  var days = Math.floor((now - start) / (24 * 60 * 60 * 1000));
+  return Math.ceil((days + start.getDay() + 1) / 7);
+}
+
+function getISOWeek(date) {
+  var d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  var dayNum = d.getUTCDay();
+  if (dayNum === 0) {
+    dayNum = 7;
+  }
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
+function getCurrentWeekAndYear() {
+  var now = new Date();
+  return {
+    week: getISOWeek(now),
+    year: now.getFullYear()
+  };
+}
+
+function getUniqueWeekKeys(entriesArray) {
+  var seen = {};
+  var result = [];
+  for (var i = 0; i < entriesArray.length; i++) {
+    var key = entriesArray[i].week + "-" + entriesArray[i].year;
+    if (!seen[key]) {
+      seen[key] = true;
+      result.push(key);
+    }
+  }
+  return result;
+}
+
+function showPage(pageId) {
+  var sections = document.querySelectorAll('.page-section');
+  forEachNodeList(sections, function(page) {
+    page.classList.remove('active');
+  });
+
+  var pageElement = document.getElementById(pageId + 'Page');
+  if (pageElement) {
+    pageElement.classList.add('active');
+  }
+
+  var navItems = document.querySelectorAll('.nav-item');
+  forEachNodeList(navItems, function(item) {
+    item.classList.remove('active');
+  });
+
+  var navItem = document.querySelector('[data-page="' + pageId + '"]');
+  if (navItem) {
+    navItem.classList.add('active');
+  }
+
+  if (pageId === 'saved') {
+    loadSavedReports();
+    updateYearFilter();
+  } else if (pageId === 'home') {
+    updateHomeStats();
+  } else if (pageId === 'backup') {
+    updateBackupStats();
+  }
+}
+
+function updateHomeStats() {
+  var realCurrentWeekData = getCurrentWeekAndYear();
+  var realCurrentWeek = realCurrentWeekData.week;
+  var realCurrentYear = realCurrentWeekData.year;
+
+  var currentWeekEntries = entries.filter(function(e) {
+    return e.week === realCurrentWeek && e.year === realCurrentYear;
+  });
+  var allWeeks = getUniqueWeekKeys(entries);
+
+  var currentWeekInfo = document.getElementById('currentWeekInfo');
+  if (currentWeekInfo) {
+    currentWeekInfo.textContent = 'Woche ' + realCurrentWeek + ', ' + realCurrentYear;
+  }
+  var savedReportsCount = document.getElementById('savedReportsCount');
+  if (savedReportsCount) {
+    savedReportsCount.textContent = allWeeks.length;
+  }
+  var thisWeekEntries = document.getElementById('thisWeekEntries');
+  if (thisWeekEntries) {
+    thisWeekEntries.textContent = currentWeekEntries.length + ' Einträge';
+  }
+}
+
+function loadSavedReports() {
+  clearSelectedReports();
+  var selectAllCheckbox = document.getElementById('selectAllCheckbox');
+  if (selectAllCheckbox) {
+    selectAllCheckbox.checked = false;
+    selectAllCheckbox.indeterminate = false;
+  }
+
+  var allWeeks = getUniqueWeekKeys(entries);
+  var container = document.getElementById('savedReportsList');
+  if (!container) {
+    return;
+  }
+
+  if (allWeeks.length === 0) {
+    container.innerHTML = '<p style="color: #666; text-align: center; padding: 20px;">Keine gespeicherten Berichte gefunden.</p>';
+    return;
+  }
+
+  allWeeks.sort();
+  allWeeks.reverse();
+  container.innerHTML = '';
+
+  for (var i = 0; i < allWeeks.length; i++) {
+    var parts = allWeeks[i].split('-');
+    var week = parts[0];
+    var year = parts[1];
+    var weekEntries = entries.filter(function(e) {
+      return String(e.week) === String(week) && String(e.year) === String(year);
+    });
+    var totalHours = 0;
+    for (var j = 0; j < weekEntries.length; j++) {
+      totalHours += parseFloat(weekEntries[j].hours || 0);
+    }
+    var reportItem = document.createElement('div');
+    reportItem.className = 'report-item';
+    reportItem.innerHTML = '' +
+      '<div class="report-content">' +
+      '  <input type="checkbox" class="report-checkbox" data-week="' + week + '" data-year="' + year + '" onchange="toggleReportSelection(\'' + allWeeks[i] + '\')" />' +
+      '  <div class="report-info">' +
+      '    <h4>Woche ' + week + ', ' + year + '</h4>' +
+      '    <span>' + weekEntries.length + ' Einträge • ' + totalHours.toFixed(2) + ' Stunden</span>' +
+      '  </div>' +
+      '</div>' +
+      '<div class="report-actions">' +
+      '  <button class="btn-small btn-view" onclick="viewReport(' + week + ', ' + year + ')" title="Anzeigen">👁️</button>' +
+      '  <button class="btn-small btn-pdf" onclick="downloadReportPDF(' + week + ', ' + year + ')" title="PDF herunterladen">📄</button>' +
+      '  <button class="btn-small btn-delete" onclick="deleteReport(' + week + ', ' + year + ')" title="Löschen">🗑️</button>' +
+      '</div>';
+    container.appendChild(reportItem);
+  }
+}
+
+function toggleReportSelection(weekYear) {
+  var parts = weekYear.split('-');
+  var checkbox = document.querySelector('input[data-week="' + parts[0] + '"][data-year="' + parts[1] + '"]');
+  if (!checkbox) {
+    return;
+  }
+  var reportItem = findAncestorByClass(checkbox, 'report-item');
+  if (checkbox.checked) {
+    addSelectedReport(weekYear);
+    if (reportItem) {
+      reportItem.classList.add('selected');
+    }
+  } else {
+    removeSelectedReport(weekYear);
+    if (reportItem) {
+      reportItem.classList.remove('selected');
+    }
+  }
+  updateSelectAllCheckbox();
+}
+
+function toggleSelectAll() {
+  var selectAllCheckbox = document.getElementById('selectAllCheckbox');
+  var allCheckboxes = document.querySelectorAll('.report-checkbox');
+  if (!selectAllCheckbox) {
+    return;
+  }
+  forEachNodeList(allCheckboxes, function(checkbox) {
+    var week = checkbox.getAttribute('data-week');
+    var year = checkbox.getAttribute('data-year');
+    var weekYear = week + '-' + year;
+    var reportItem = findAncestorByClass(checkbox, 'report-item');
+    checkbox.checked = selectAllCheckbox.checked;
+    if (selectAllCheckbox.checked) {
+      addSelectedReport(weekYear);
+      if (reportItem) {
+        reportItem.classList.add('selected');
+      }
+    } else {
+      removeSelectedReport(weekYear);
+      if (reportItem) {
+        reportItem.classList.remove('selected');
+      }
+    }
+  });
+}
+
+function updateSelectAllCheckbox() {
+  var allCheckboxes = document.querySelectorAll('.report-checkbox');
+  var checkedCheckboxes = document.querySelectorAll('.report-checkbox:checked');
+  var selectAllCheckbox = document.getElementById('selectAllCheckbox');
+  if (!selectAllCheckbox) {
+    return;
+  }
+  if (checkedCheckboxes.length === 0) {
+    selectAllCheckbox.indeterminate = false;
+    selectAllCheckbox.checked = false;
+  } else if (checkedCheckboxes.length === allCheckboxes.length) {
+    selectAllCheckbox.indeterminate = false;
+    selectAllCheckbox.checked = true;
+  } else {
+    selectAllCheckbox.indeterminate = true;
+  }
+}
+
+function downloadReportPDF(week, year) {
+  var originalWeek = currentWeek;
+  var originalYear = currentYear;
+  currentWeek = parseInt(week, 10);
+  currentYear = parseInt(year, 10);
+  downloadPDF();
+  currentWeek = originalWeek;
+  currentYear = originalYear;
+}
+
+function downloadSelectedPDFs() {
+  var selected = getSelectedReportsArray();
+  if (selected.length === 0) {
+    alert('Bitte wählen Sie mindestens einen Bericht aus.');
+    return;
+  }
+  var personal = {};
+  try {
+    personal = JSON.parse(localStorage.getItem('timesheetPersonal') || '{}');
+  } catch (parseError) {
+    personal = {};
+  }
+  var sorted = selected.slice(0);
+  sorted.sort();
+  var allPages = [];
+  for (var i = 0; i < sorted.length; i++) {
+    var parts = sorted[i].split('-');
+    var weekNumber = parseInt(parts[0], 10);
+    var yearNumber = parseInt(parts[1], 10);
+    var weekEntries = getWeekEntriesSorted(weekNumber, yearNumber);
+    var pages = createWeekPages(weekNumber, yearNumber, personal, weekEntries);
+    allPages = allPages.concat(pages);
+  }
+  var today = new Date();
+  var filename = 'Wochenberichte_Ausgewählte_' + formatDateISO(today) + '.pdf';
+  savePdfDocument(filename, allPages);
+}
+
+function exportSelectedReports() {
+  var selected = getSelectedReportsArray();
+  if (selected.length === 0) {
+    alert('Bitte wählen Sie mindestens einen Bericht aus.');
+    return;
+  }
+  var selectedEntries = [];
+  for (var i = 0; i < selected.length; i++) {
+    var parts = selected[i].split('-');
+    var week = parts[0];
+    var year = parts[1];
+    var weekEntries = entries.filter(function(e) {
+      return String(e.week) === String(week) && String(e.year) === String(year);
+    });
+    selectedEntries = selectedEntries.concat(weekEntries);
+  }
+  var personalData = JSON.parse(localStorage.getItem('timesheetPersonal') || '{}');
+  var exportData = {
+    entries: selectedEntries,
+    personalData: personalData,
+    exportDate: formatDateTimeISO(new Date()),
+    type: 'selected_reports',
+    selectedWeeks: selected
+  };
+  var today = formatDateISO(new Date());
+  downloadJSON(exportData, 'Ausgewählte_Berichte_' + today + '.json');
+}
+
+function deleteSelectedReports() {
+  var selected = getSelectedReportsArray();
+  if (selected.length === 0) {
+    alert('Bitte wählen Sie mindestens einen Bericht aus.');
+    return;
+  }
+  if (!confirm(selected.length + ' Wochenberichte wirklich löschen?')) {
+    return;
+  }
+  for (var i = 0; i < selected.length; i++) {
+    var parts = selected[i].split('-');
+    var week = parts[0];
+    var year = parts[1];
+    entries = entries.filter(function(e) {
+      return !(String(e.week) === String(week) && String(e.year) === String(year));
+    });
+  }
+  saveToStorage();
+  loadSavedReports();
+  updateHomeStats();
+}
+
+function viewReport(week, year) {
+  currentWeek = parseInt(week, 10);
+  currentYear = parseInt(year, 10);
+  var weekDisplay = document.getElementById('weekDisplay');
+  if (weekDisplay) {
+    weekDisplay.textContent = 'Woche ' + currentWeek + ', ' + currentYear;
+  }
+  displayEntries();
+  showPage('create');
+}
+
+function deleteReport(week, year) {
+  if (!confirm('Wochenbericht für Woche ' + week + ', ' + year + ' wirklich löschen?')) {
+    return;
+  }
+  entries = entries.filter(function(e) {
+    return !(String(e.week) === String(week) && String(e.year) === String(year));
+  });
+  saveToStorage();
+  loadSavedReports();
+  updateHomeStats();
+}
+
+function downloadCurrentWeekPDF() {
+  downloadPDF();
+}
+
+function toggleTheme() {
+  var html = document.documentElement;
+  var current = html.getAttribute('data-theme');
+  var newTheme = current === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', newTheme);
+  localStorage.setItem('theme', newTheme);
+  updateThemeButton();
+}
+
+function updateThemeButton() {
+  var current = document.documentElement.getAttribute('data-theme');
+  var btn = document.querySelector('.theme-toggle');
+  if (btn) {
+    btn.textContent = current === 'dark' ? '☀️ Light' : '🌙 Dark';
+  }
+}
+
+function loadTheme() {
+  var stored = localStorage.getItem('theme');
+  var theme = stored === 'dark' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+  updateThemeButton();
+}
+
+function saveToStorage() {
+  localStorage.setItem('timesheetEntries', JSON.stringify(entries));
+}
+
+function savePersonalData() {
+  var personalData = {
+    name: document.getElementById('name') ? document.getElementById('name').value.trim() : '',
+    position: document.getElementById('position') ? document.getElementById('position').value.trim() : '',
+    specialist: document.getElementById('specialist') ? document.getElementById('specialist').value.trim() : '',
+    department: document.getElementById('department') ? document.getElementById('department').value.trim() : ''
+  };
+  localStorage.setItem('timesheetPersonal', JSON.stringify(personalData));
+}
+
+function loadPersonalData() {
+  var data = JSON.parse(localStorage.getItem('timesheetPersonal') || '{}');
+  if (data.name && document.getElementById('name')) {
+    document.getElementById('name').value = data.name;
+  }
+  if (data.position && document.getElementById('position')) {
+    document.getElementById('position').value = data.position;
+  }
+  if (data.specialist && document.getElementById('specialist')) {
+    document.getElementById('specialist').value = data.specialist;
+  }
+  if (data.department && document.getElementById('department')) {
+    document.getElementById('department').value = data.department;
+  }
+}
+
+function clearAllData() {
+  if (!confirm('Alle gespeicherten Daten wirklich löschen?')) {
+    return;
+  }
+  localStorage.clear();
+  entries = [];
+  if (document.getElementById('name')) { document.getElementById('name').value = ''; }
+  if (document.getElementById('position')) { document.getElementById('position').value = ''; }
+  if (document.getElementById('specialist')) { document.getElementById('specialist').value = ''; }
+  if (document.getElementById('department')) { document.getElementById('department').value = ''; }
+  if (document.getElementById('activity')) { document.getElementById('activity').value = ''; }
+  displayEntries();
+  updateHomeStats();
+  updateBackupStats();
+}
+
+function changeWeek(direction) {
+  currentWeek += direction;
+  if (currentWeek < 1) {
+    currentWeek = 52;
+    currentYear -= 1;
+  } else if (currentWeek > 52) {
+    currentWeek = 1;
+    currentYear += 1;
+  }
+  var weekDisplay = document.getElementById('weekDisplay');
+  if (weekDisplay) {
+    weekDisplay.textContent = 'Woche ' + currentWeek + ', ' + currentYear;
+  }
+  displayEntries();
+}
+
+function addEntry() {
+  var nameField = document.getElementById('name');
+  var activityField = document.getElementById('activity');
+  var startField = document.getElementById('startTime');
+  var endField = document.getElementById('endTime');
+  var breakField = document.getElementById('breakTime');
+  var workdaySelect = document.getElementById('workday');
+
+  var name = nameField ? nameField.value.trim() : '';
+  var workday = workdaySelect ? workdaySelect.value : '';
+  var activity = activityField ? activityField.value.trim() : '';
+  var startTime = startField ? startField.value : '';
+  var endTime = endField ? endField.value : '';
+  var breakMins = breakField ? parseInt(breakField.value, 10) || 0 : 0;
+
+  if (!name || !activity || !startTime || !endTime) {
+    alert('Bitte fülle alle Pflichtfelder aus.');
+    return;
+  }
+
+  var startParts = startTime.split(':');
+  var endParts = endTime.split(':');
+  var start = new Date(1970, 0, 1, parseInt(startParts[0], 10), parseInt(startParts[1], 10));
+  var end = new Date(1970, 0, 1, parseInt(endParts[0], 10), parseInt(endParts[1], 10));
+  var diffHours = (end - start) / 3600000 - breakMins / 60;
+  if (diffHours < 0) {
+    diffHours = 0;
+  }
+  var entry = {
+    id: new Date().getTime(),
+    week: currentWeek,
+    year: currentYear,
+    name: name,
+    workday: workday,
+    activity: activity,
+    startTime: startTime,
+    endTime: endTime,
+    breakTime: breakMins,
+    hours: diffHours.toFixed(2)
+  };
+  entries.push(entry);
+  saveToStorage();
+  displayEntries();
+  updateHomeStats();
+  if (activityField) {
+    activityField.value = '';
+  }
+}
+
+function displayEntries() {
+  var entriesContainer = document.getElementById('entries');
+  if (!entriesContainer) {
+    return;
+  }
+  var weekEntries = entries.filter(function(e) {
+    return e.week === currentWeek && e.year === currentYear;
+  });
+  weekEntries.sort(function(a, b) {
+    return dayOrder[a.workday] - dayOrder[b.workday];
+  });
+  entriesContainer.innerHTML = '';
+  if (weekEntries.length === 0) {
+    entriesContainer.innerHTML = '<div class="no-entries-message">Keine Einträge für diese Woche vorhanden.<br><small>Fügen Sie oben einen neuen Eintrag hinzu.</small></div>';
+    return;
+  }
+  for (var i = 0; i < weekEntries.length; i++) {
+    var entry = weekEntries[i];
+    var entryDiv = document.createElement('div');
+    entryDiv.className = 'entry-item';
+    entryDiv.innerHTML = '' +
+      '<div class="entry-header">' +
+      '  <div>' +
+      '    <div class="entry-name">' + entry.workday + '</div>' +
+      '    <div class="entry-time">' + entry.startTime + ' - ' + entry.endTime + ' (' + Number(entry.hours).toFixed(2) + 'h)</div>' +
+      '  </div>' +
+      '  <div class="entry-actions">' +
+      '    <button class="entry-edit-btn" onclick="editEntry(' + entry.id + ')" title="Bearbeiten">✏️</button>' +
+      '    <button class="entry-delete-btn" onclick="deleteEntry(' + entry.id + ')" title="Löschen">🗑️</button>' +
+      '  </div>' +
+      '</div>' +
+      '<div class="entry-description">' + escapeHtml(entry.activity) + '</div>';
+    entriesContainer.appendChild(entryDiv);
+  }
+}
+
+function deleteEntry(id) {
+  if (!confirm('Eintrag wirklich löschen?')) {
+    return;
+  }
+  entries = entries.filter(function(e) {
+    return e.id !== id;
+  });
+  saveToStorage();
+  displayEntries();
+  updateHomeStats();
+  updateBackupStats();
+}
+
+function editEntry(id) {
+  var entry = null;
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].id === id) {
+      entry = entries[i];
+      break;
+    }
+  }
+  if (!entry) {
+    return;
+  }
+  editingEntryId = id;
+  if (document.getElementById('editWorkday')) { document.getElementById('editWorkday').value = entry.workday; }
+  if (document.getElementById('editActivity')) { document.getElementById('editActivity').value = entry.activity; }
+  if (document.getElementById('editStartTime')) { document.getElementById('editStartTime').value = entry.startTime; }
+  if (document.getElementById('editEndTime')) { document.getElementById('editEndTime').value = entry.endTime; }
+  if (document.getElementById('editBreakTime')) { document.getElementById('editBreakTime').value = entry.breakTime; }
+  document.getElementById('editModal').style.display = 'block';
+}
+
+function closeEditModal() {
+  var modal = document.getElementById('editModal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+  editingEntryId = null;
+}
+
+function saveEdit() {
+  if (!editingEntryId) {
+    return;
+  }
+  var entry = null;
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].id === editingEntryId) {
+      entry = entries[i];
+      break;
+    }
+  }
+  if (!entry) {
+    return;
+  }
+  var workday = document.getElementById('editWorkday') ? document.getElementById('editWorkday').value : entry.workday;
+  var activity = document.getElementById('editActivity') ? document.getElementById('editActivity').value.trim() : entry.activity;
+  var startTime = document.getElementById('editStartTime') ? document.getElementById('editStartTime').value : entry.startTime;
+  var endTime = document.getElementById('editEndTime') ? document.getElementById('editEndTime').value : entry.endTime;
+  var breakMins = document.getElementById('editBreakTime') ? parseInt(document.getElementById('editBreakTime').value, 10) || 0 : entry.breakTime;
+  if (!activity || !startTime || !endTime) {
+    alert('Bitte fülle alle Pflichtfelder aus.');
+    return;
+  }
+  var startParts = startTime.split(':');
+  var endParts = endTime.split(':');
+  var start = new Date(1970, 0, 1, parseInt(startParts[0], 10), parseInt(startParts[1], 10));
+  var end = new Date(1970, 0, 1, parseInt(endParts[0], 10), parseInt(endParts[1], 10));
+  var diffHours = (end - start) / 3600000 - breakMins / 60;
+  if (diffHours < 0) {
+    diffHours = 0;
+  }
+  entry.workday = workday;
+  entry.activity = activity;
+  entry.startTime = startTime;
+  entry.endTime = endTime;
+  entry.breakTime = breakMins;
+  entry.hours = diffHours.toFixed(2);
+  saveToStorage();
+  displayEntries();
+  updateHomeStats();
+  updateBackupStats();
+  closeEditModal();
+}
+
+window.onclick = function(event) {
+  var modal = document.getElementById('editModal');
+  if (event.target === modal) {
+    closeEditModal();
+  }
+};
+
+function escapeHtml(unsafe) {
+  if (unsafe === null || unsafe === undefined) {
+    return '';
+  }
+  return String(unsafe)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+    .replace(/\n/g, '<br/>');
+}
+
+function downloadPDF() {
+  var personal = {};
+  try {
+    personal = JSON.parse(localStorage.getItem('timesheetPersonal') || '{}');
+  } catch (parseError) {
+    personal = {};
+  }
+  var weekEntries = getWeekEntriesSorted(currentWeek, currentYear);
+  var pages = createWeekPages(currentWeek, currentYear, personal, weekEntries);
+  var filename = 'Wochenbericht_KW' + currentWeek + '_' + currentYear + '.pdf';
+  savePdfDocument(filename, pages);
+}
+
+function fillExampleEmail() {
+  var ausbilder = document.getElementById('position') ? document.getElementById('position').value.trim() : '';
+  var personName = document.getElementById('name') ? document.getElementById('name').value.trim() : '';
+  if (!ausbilder) {
+    ausbilder = '[Ausbilder Name]';
+  }
+  if (!personName) {
+    personName = '[Ihr Name]';
+  }
+  if (document.getElementById('emailSubject')) {
+    document.getElementById('emailSubject').value = 'Wochenbericht KW ' + currentWeek + ' ' + personName;
+  }
+  if (document.getElementById('emailBody')) {
+    document.getElementById('emailBody').value = 'Liebe/r ' + ausbilder + ',\n\nHier ist mein Wochenbericht für die KW' + currentWeek + '.\n\nLiebe Grüße\n' + personName;
+  }
+}
+
+function sendEmail() {
+  var to = document.getElementById('emailTo') ? document.getElementById('emailTo').value : '';
+  var cc = document.getElementById('emailCc') ? document.getElementById('emailCc').value : '';
+  var subject = document.getElementById('emailSubject') ? document.getElementById('emailSubject').value : '';
+  var body = document.getElementById('emailBody') ? document.getElementById('emailBody').value : '';
+  if (!to) {
+    alert('Bitte Empfänger eintragen.');
+    return;
+  }
+  var mailto = 'mailto:' + encodeURIComponent(to) + '?cc=' + encodeURIComponent(cc) + '&subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+  window.location.href = mailto;
+}
+
+function exportAllData() {
+  var allData = {
+    entries: entries,
+    personalData: JSON.parse(localStorage.getItem('timesheetPersonal') || '{}'),
+    theme: localStorage.getItem('theme') || 'light',
+    exportDate: formatDateTimeISO(new Date()),
+    version: '1.0'
+  };
+  var now = new Date();
+  var today = formatDateISO(now);
+  downloadJSON(allData, 'Wochenbericht_Backup_' + today + '.json');
+  localStorage.setItem('lastBackup', String(now.getTime()));
+  updateBackupStats();
+}
+
+function exportPersonalDataOnly() {
+  var personalData = {
+    personalData: JSON.parse(localStorage.getItem('timesheetPersonal') || '{}'),
+    exportDate: formatDateTimeISO(new Date()),
+    type: 'personal_only'
+  };
+  var today = formatDateISO(new Date());
+  downloadJSON(personalData, 'Persönliche_Daten_' + today + '.json');
+}
+
+function exportReportsOnly() {
+  var reportsData = {
+    entries: entries,
+    exportDate: formatDateTimeISO(new Date()),
+    type: 'reports_only'
+  };
+  var today = formatDateISO(new Date());
+  downloadJSON(reportsData, 'Wochenberichte_' + today + '.json');
+}
+
+function downloadJSON(data, filename) {
+  var json = JSON.stringify(data, null, 2);
+  var targetName = filename || 'export.json';
+  if (fileSystemHelper) {
+    var savedPath = fileSystemHelper.saveTextFile(targetName, json);
+    if (savedPath) {
+      alert('Datei gespeichert unter:\n' + savedPath);
+    } else {
+      alert('Datei konnte nicht gespeichert werden.');
+    }
+    return;
+  }
+  if (window.Blob && window.URL && window.URL.createObjectURL) {
+    var blob = new Blob([json], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = targetName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } else {
+    alert('Export wird in dieser Umgebung nicht unterstützt.');
+  }
+}
+
+function importData() {
+  var fileInput = document.getElementById('importFile');
+  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+    alert('Bitte wählen Sie eine Datei aus.');
+    return;
+  }
+  if (!confirm('ACHTUNG: Dies wird alle aktuellen Daten überschreiben! Möchten Sie fortfahren?')) {
+    return;
+  }
+  var file = fileInput.files[0];
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var importedData = JSON.parse(e.target.result);
+      if (importedData.entries) {
+        entries = importedData.entries;
+        saveToStorage();
+      }
+      if (importedData.personalData) {
+        localStorage.setItem('timesheetPersonal', JSON.stringify(importedData.personalData));
+        loadPersonalData();
+      }
+      if (importedData.theme) {
+        localStorage.setItem('theme', importedData.theme);
+        loadTheme();
+      }
+      displayEntries();
+      updateHomeStats();
+      updateBackupStats();
+      alert('Daten erfolgreich importiert!');
+    } catch (error) {
+      alert('Fehler beim Importieren: Ungültige Datei oder Format.');
+      if (window.console) {
+        console.error('Import error:', error);
+      }
+    }
+  };
+  reader.readAsText(file);
+}
+
+function importDataMerge() {
+  var fileInput = document.getElementById('importFile');
+  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+    alert('Bitte wählen Sie eine Datei aus.');
+    return;
+  }
+  if (!confirm('Dies wird die importierten Daten zu Ihren bestehenden Daten hinzufügen. Fortfahren?')) {
+    return;
+  }
+  var file = fileInput.files[0];
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var importedData = JSON.parse(e.target.result);
+      if (importedData.entries) {
+        var existingIds = {};
+        for (var i = 0; i < entries.length; i++) {
+          existingIds[entries[i].id] = true;
+        }
+        for (var j = 0; j < importedData.entries.length; j++) {
+          var entry = importedData.entries[j];
+          if (!existingIds[entry.id]) {
+            entries.push(entry);
+          }
+        }
+        saveToStorage();
+      }
+      displayEntries();
+      updateHomeStats();
+      updateBackupStats();
+      alert((importedData.entries ? importedData.entries.length : 0) + ' Einträge erfolgreich hinzugefügt!');
+    } catch (error) {
+      alert('Fehler beim Importieren: Ungültige Datei oder Format.');
+      if (window.console) {
+        console.error('Import error:', error);
+      }
+    }
+  };
+  reader.readAsText(file);
+}
+
+function updateBackupStats() {
+  var totalEntries = entries.length;
+  var totalHours = 0;
+  for (var i = 0; i < entries.length; i++) {
+    totalHours += parseFloat(entries[i].hours || 0);
+  }
+  var uniqueWeeks = getUniqueWeekKeys(entries);
+  var totalWeekReports = uniqueWeeks.length;
+  var avgHoursPerWeek = totalWeekReports > 0 ? (totalHours / totalWeekReports) : 0;
+  var lastBackup = localStorage.getItem('lastBackup');
+  var lastEditedWeek = 'Keine';
+  if (entries.length > 0) {
+    var sortedEntries = entries.slice(0).sort(function(a, b) {
+      return b.id - a.id;
+    });
+    var lastEntry = sortedEntries[0];
+    lastEditedWeek = 'Woche ' + lastEntry.week + ', ' + lastEntry.year;
+  }
+  if (document.getElementById('totalEntries')) { document.getElementById('totalEntries').textContent = totalEntries; }
+  if (document.getElementById('totalWeekReports')) { document.getElementById('totalWeekReports').textContent = totalWeekReports; }
+  if (document.getElementById('totalHours')) { document.getElementById('totalHours').textContent = totalHours.toFixed(2); }
+  if (document.getElementById('avgHoursPerWeek')) { document.getElementById('avgHoursPerWeek').textContent = avgHoursPerWeek.toFixed(2); }
+  if (document.getElementById('lastEditedWeek')) { document.getElementById('lastEditedWeek').textContent = lastEditedWeek; }
+  if (document.getElementById('lastBackup')) {
+    if (lastBackup) {
+      var timestamp = parseInt(lastBackup, 10);
+      if (!isNaN(timestamp)) {
+        var backupDate = new Date(timestamp);
+        document.getElementById('lastBackup').textContent = formatGermanDateTime(backupDate);
+      } else {
+        document.getElementById('lastBackup').textContent = 'Unbekannt';
+      }
+    } else {
+      document.getElementById('lastBackup').textContent = 'Nie';
+    }
+  }
+}
+
+function updateYearFilter() {
+  var yearFilter = document.getElementById('yearFilter');
+  if (!yearFilter) {
+    return;
+  }
+  var years = getUniqueWeekKeys(entries).map(function(key) {
+    return parseInt(key.split('-')[1], 10);
+  });
+  years.sort(function(a, b) { return b - a; });
+  yearFilter.innerHTML = '<option value="">Alle Jahre</option>';
+  for (var i = 0; i < years.length; i++) {
+    var option = document.createElement('option');
+    option.value = years[i];
+    option.textContent = years[i];
+    yearFilter.appendChild(option);
+  }
+}
+
+function filterReports() {
+  var searchTerm = document.getElementById('searchInput') ? document.getElementById('searchInput').value.toLowerCase() : '';
+  var yearFilterValue = document.getElementById('yearFilter') ? document.getElementById('yearFilter').value : '';
+  var minHours = document.getElementById('minHours') ? parseFloat(document.getElementById('minHours').value) || 0 : 0;
+  var maxHours = document.getElementById('maxHours') ? parseFloat(document.getElementById('maxHours').value) : NaN;
+  if (isNaN(maxHours) || maxHours <= 0) {
+    maxHours = Infinity;
+  }
+  var sortBy = document.getElementById('sortBy') ? document.getElementById('sortBy').value : 'week-desc';
+  var groupedEntries = {};
+  for (var i = 0; i < entries.length; i++) {
+    var entry = entries[i];
+    var key = entry.week + '-' + entry.year;
+    if (!groupedEntries[key]) {
+      groupedEntries[key] = [];
+    }
+    groupedEntries[key].push(entry);
+  }
+  var filteredWeeks = [];
+  for (var key in groupedEntries) {
+    if (!groupedEntries.hasOwnProperty(key)) {
+      continue;
+    }
+    var parts = key.split('-');
+    var week = parts[0];
+    var year = parts[1];
+    if (yearFilterValue && year !== yearFilterValue) {
+      continue;
+    }
+    var weekEntries = groupedEntries[key];
+    var totalHours = 0;
+    var matchesSearch = false;
+    for (var j = 0; j < weekEntries.length; j++) {
+      totalHours += parseFloat(weekEntries[j].hours || 0);
+      if (!matchesSearch && searchTerm) {
+        var text = (weekEntries[j].activity || '').toLowerCase();
+        var day = (weekEntries[j].workday || '').toLowerCase();
+        if (text.indexOf(searchTerm) !== -1 || day.indexOf(searchTerm) !== -1) {
+          matchesSearch = true;
+        }
+      }
+    }
+    if (totalHours < minHours || totalHours > maxHours) {
+      continue;
+    }
+    if (searchTerm) {
+      var weekLabel = ('woche ' + week).toLowerCase();
+      if (!matchesSearch && weekLabel.indexOf(searchTerm) === -1 && year.toLowerCase().indexOf(searchTerm) === -1) {
+        continue;
+      }
+    }
+    filteredWeeks.push(key);
+  }
+  filteredWeeks.sort(function(a, b) {
+    var partsA = a.split('-');
+    var partsB = b.split('-');
+    var weekA = parseInt(partsA[0], 10);
+    var yearA = parseInt(partsA[1], 10);
+    var weekB = parseInt(partsB[0], 10);
+    var yearB = parseInt(partsB[1], 10);
+    var hoursA = 0;
+    var hoursB = 0;
+    var entriesA = groupedEntries[a];
+    var entriesB = groupedEntries[b];
+    for (var i = 0; i < entriesA.length; i++) {
+      hoursA += parseFloat(entriesA[i].hours || 0);
+    }
+    for (var j = 0; j < entriesB.length; j++) {
+      hoursB += parseFloat(entriesB[j].hours || 0);
+    }
+    if (sortBy === 'week-asc') {
+      return yearA === yearB ? weekA - weekB : yearA - yearB;
+    } else if (sortBy === 'week-desc') {
+      return yearA === yearB ? weekB - weekA : yearB - yearA;
+    } else if (sortBy === 'hours-asc') {
+      return hoursA - hoursB;
+    } else if (sortBy === 'hours-desc') {
+      return hoursB - hoursA;
+    }
+    return yearA === yearB ? weekB - weekA : yearB - yearA;
+  });
+  filteredEntries = [];
+  for (var i = 0; i < filteredWeeks.length; i++) {
+    var key = filteredWeeks[i];
+    filteredEntries = filteredEntries.concat(groupedEntries[key]);
+  }
+  var resultsDiv = document.getElementById('filterResults');
+  if (resultsDiv) {
+    if (searchTerm || yearFilterValue || minHours > 0 || maxHours < Infinity) {
+      var totalFilteredHours = 0;
+      for (var i = 0; i < filteredEntries.length; i++) {
+        totalFilteredHours += parseFloat(filteredEntries[i].hours || 0);
+      }
+      resultsDiv.textContent = '🔍 ' + filteredWeeks.length + ' Wochenberichte gefunden (' + filteredEntries.length + ' Einträge, ' + totalFilteredHours.toFixed(2) + ' Stunden)';
+      resultsDiv.style.display = 'block';
+    } else {
+      resultsDiv.style.display = 'none';
+    }
+  }
+  loadFilteredReports(filteredWeeks, groupedEntries);
+}
+
+function loadFilteredReports(filteredWeeks, groupedEntries) {
+  clearSelectedReports();
+  var selectAllCheckbox = document.getElementById('selectAllCheckbox');
+  if (selectAllCheckbox) {
+    selectAllCheckbox.checked = false;
+    selectAllCheckbox.indeterminate = false;
+  }
+  var container = document.getElementById('savedReportsList');
+  if (!container) {
+    return;
+  }
+  if (!filteredWeeks || filteredWeeks.length === 0) {
+    container.innerHTML = '<p style="color: #666; text-align: center; padding: 20px;">Keine Berichte entsprechen den Filterkriterien.</p>';
+    return;
+  }
+  container.innerHTML = '';
+  for (var i = 0; i < filteredWeeks.length; i++) {
+    var weekYear = filteredWeeks[i];
+    var parts = weekYear.split('-');
+    var week = parts[0];
+    var year = parts[1];
+    var weekEntries = groupedEntries[weekYear] || [];
+    var totalHours = 0;
+    for (var j = 0; j < weekEntries.length; j++) {
+      totalHours += parseFloat(weekEntries[j].hours || 0);
+    }
+    var reportItem = document.createElement('div');
+    reportItem.className = 'report-item';
+    reportItem.innerHTML = '' +
+      '<div class="report-content">' +
+      '  <input type="checkbox" class="report-checkbox" data-week="' + week + '" data-year="' + year + '" onchange="toggleReportSelection(\'' + weekYear + '\')" />' +
+      '  <div class="report-info">' +
+      '    <h4>Woche ' + week + ', ' + year + '</h4>' +
+      '    <span>' + weekEntries.length + ' Einträge • ' + totalHours.toFixed(2) + ' Stunden</span>' +
+      '  </div>' +
+      '</div>' +
+      '<div class="report-actions">' +
+      '  <button class="btn-small btn-view" onclick="viewReport(' + week + ', ' + year + ')" title="Anzeigen">👁️</button>' +
+      '  <button class="btn-small btn-pdf" onclick="downloadReportPDF(' + week + ', ' + year + ')" title="PDF herunterladen">📄</button>' +
+      '  <button class="btn-small btn-delete" onclick="deleteReport(' + week + ', ' + year + ')" title="Löschen">🗑️</button>' +
+      '</div>';
+    container.appendChild(reportItem);
+  }
+}
+
+function clearFilters() {
+  if (document.getElementById('searchInput')) { document.getElementById('searchInput').value = ''; }
+  if (document.getElementById('yearFilter')) { document.getElementById('yearFilter').value = ''; }
+  if (document.getElementById('minHours')) { document.getElementById('minHours').value = ''; }
+  if (document.getElementById('maxHours')) { document.getElementById('maxHours').value = ''; }
+  if (document.getElementById('sortBy')) { document.getElementById('sortBy').value = 'week-desc'; }
+  filteredEntries = [];
+  var resultsDiv = document.getElementById('filterResults');
+  if (resultsDiv) {
+    resultsDiv.style.display = 'none';
+  }
+  loadSavedReports();
+}
+
+function exportFilteredData() {
+  if (!filteredEntries || filteredEntries.length === 0) {
+    alert('Keine gefilterten Daten zum Exportieren vorhanden. Bitte wenden Sie Filter an.');
+    return;
+  }
+  var personalData = JSON.parse(localStorage.getItem('timesheetPersonal') || '{}');
+  var totalHours = 0;
+  for (var i = 0; i < filteredEntries.length; i++) {
+    totalHours += parseFloat(filteredEntries[i].hours || 0);
+  }
+  var filteredData = {
+    entries: filteredEntries,
+    personalData: personalData,
+    exportDate: formatDateTimeISO(new Date()),
+    type: 'filtered_data',
+    filterInfo: {
+      totalEntries: filteredEntries.length,
+      totalHours: totalHours.toFixed(2)
+    }
+  };
+  var today = formatDateISO(new Date());
+  downloadJSON(filteredData, 'Gefilterte_Wochenberichte_' + today + '.json');
+}
+
+function showDataDetails(filteredWeeks, groupedEntries) {
+  var detailsSection = document.getElementById('dataDetailsSection');
+  var detailsList = document.getElementById('dataDetailsList');
+  var countDiv = document.getElementById('filteredDataCount');
+  if (!detailsSection || !detailsList || !countDiv) {
+    return;
+  }
+  detailsSection.style.display = 'block';
+  var html = '<h3>📊 Persönliche Daten</h3>';
+  var personalData = JSON.parse(localStorage.getItem('timesheetPersonal') || '{}');
+  html += '<div class="report-item">';
+  html += '<div class="report-info">';
+  html += '<h4>Persönliche Informationen</h4>';
+  html += '<span>Name: ' + (personalData.name || 'Nicht gesetzt') + ' | Ausbilder: ' + (personalData.position || 'Nicht gesetzt') + ' | Fachkraft: ' + (personalData.specialist || 'Nicht gesetzt') + ' | Dienstort: ' + (personalData.department || 'Nicht gesetzt') + '</span>';
+  html += '</div>';
+  html += '<div class="report-actions">';
+  html += '<button class="btn-small btn-delete" onclick="clearPersonalData()">Löschen</button>';
+  html += '</div>';
+  html += '</div>';
+  html += '<h3>📋 Wochenberichte</h3>';
+  var weeksToShow;
+  var entriesData;
+  if (filteredWeeks && groupedEntries) {
+    weeksToShow = filteredWeeks.slice(0);
+    entriesData = groupedEntries;
+  } else {
+    entriesData = {};
+    for (var i = 0; i < entries.length; i++) {
+      var key = entries[i].week + '-' + entries[i].year;
+      if (!entriesData[key]) {
+        entriesData[key] = [];
+      }
+      entriesData[key].push(entries[i]);
+    }
+    weeksToShow = Object.keys(entriesData);
+    weeksToShow.sort();
+    weeksToShow.reverse();
+  }
+  var totalFilteredEntries = 0;
+  for (var i = 0; i < weeksToShow.length; i++) {
+    totalFilteredEntries += entriesData[weeksToShow[i]].length;
+  }
+  if (filteredWeeks && groupedEntries) {
+    countDiv.textContent = '🔍 Gefilterte Ansicht: ' + weeksToShow.length + ' Wochenberichte (' + totalFilteredEntries + ' Einträge)';
+    countDiv.style.color = '#0b62d4';
+    countDiv.style.fontWeight = 'bold';
+  } else {
+    countDiv.textContent = '📊 Alle Daten: ' + weeksToShow.length + ' Wochenberichte (' + totalFilteredEntries + ' Einträge)';
+    countDiv.style.color = '#666';
+    countDiv.style.fontWeight = 'normal';
+  }
+  if (weeksToShow.length === 0) {
+    html += '<p style="color: #666; text-align: center; padding: 20px;">Keine Einträge gefunden.</p>';
+  } else {
+    for (var i = 0; i < weeksToShow.length; i++) {
+      var weekYear = weeksToShow[i];
+      var parts = weekYear.split('-');
+      var week = parts[0];
+      var year = parts[1];
+      var weekEntries = entriesData[weekYear] || [];
+      var totalHours = 0;
+      weekEntries.sort(function(a, b) {
+        return dayOrder[a.workday] - dayOrder[b.workday];
+      });
+      for (var j = 0; j < weekEntries.length; j++) {
+        totalHours += parseFloat(weekEntries[j].hours || 0);
+      }
+      html += '<div class="report-item">';
+      html += '<div class="report-info">';
+      html += '<h4>Woche ' + week + ', ' + year + '</h4>';
+      html += '<span>' + weekEntries.length + ' Einträge • ' + totalHours.toFixed(2) + ' Stunden</span>';
+      html += '<br><small>';
+      for (var k = 0; k < weekEntries.length; k++) {
+        html += weekEntries[k].workday + ' (' + weekEntries[k].hours + 'h)';
+        if (k < weekEntries.length - 1) {
+          html += ', ';
+        }
+      }
+      html += '</small>';
+      html += '</div>';
+      html += '<div class="report-actions">';
+      html += '<button class="btn-small btn-view" onclick="viewReportFromDetails(' + week + ', ' + year + ')" title="Bearbeiten">✏️</button>';
+      html += '<button class="btn-small btn-delete" onclick="deleteReportFromDetails(' + week + ', ' + year + ')">Löschen</button>';
+      html += '</div>';
+      html += '</div>';
+    }
+  }
+  detailsList.innerHTML = html;
+  try {
+    detailsSection.scrollIntoView(true);
+  } catch (e) {
+    // Ignoriere Scroll-Fehler in älteren Browsern
+  }
+}
+
+function viewReportFromDetails(week, year) {
+  currentWeek = parseInt(week, 10);
+  currentYear = parseInt(year, 10);
+  var weekDisplay = document.getElementById('weekDisplay');
+  if (weekDisplay) {
+    weekDisplay.textContent = 'Woche ' + currentWeek + ', ' + currentYear;
+  }
+  displayEntries();
+  showPage('create');
+}
+
+function hideDataDetails() {
+  var detailsSection = document.getElementById('dataDetailsSection');
+  if (detailsSection) {
+    detailsSection.style.display = 'none';
+  }
+}
+
+function deleteReportFromDetails(week, year) {
+  if (!confirm('Wochenbericht für Woche ' + week + ', ' + year + ' wirklich löschen?')) {
+    return;
+  }
+  entries = entries.filter(function(e) {
+    return !(String(e.week) === String(week) && String(e.year) === String(year));
+  });
+  saveToStorage();
+  var hasActiveFilters = false;
+  if (document.getElementById('searchInput') && document.getElementById('searchInput').value) { hasActiveFilters = true; }
+  if (document.getElementById('yearFilter') && document.getElementById('yearFilter').value) { hasActiveFilters = true; }
+  if (document.getElementById('minHours') && document.getElementById('minHours').value) { hasActiveFilters = true; }
+  if (document.getElementById('maxHours') && document.getElementById('maxHours').value) { hasActiveFilters = true; }
+  if (hasActiveFilters) {
+    filterReports();
+  } else {
+    showDataDetails();
+  }
+  updateBackupStats();
+  updateHomeStats();
+}
+
+function clearPersonalData() {
+  if (!confirm('Persönliche Daten wirklich löschen?')) {
+    return;
+  }
+  localStorage.removeItem('timesheetPersonal');
+  if (document.getElementById('name')) { document.getElementById('name').value = ''; }
+  if (document.getElementById('position')) { document.getElementById('position').value = ''; }
+  if (document.getElementById('specialist')) { document.getElementById('specialist').value = ''; }
+  if (document.getElementById('department')) { document.getElementById('department').value = ''; }
+  showDataDetails();
+  alert('Persönliche Daten gelöscht.');
+}
+
+function clearAllDataConfirm() {
+  if (!confirm('ACHTUNG: Dies löscht ALLE Daten unwiderruflich!\n\nMöchten Sie vorher ein Backup erstellen?')) {
+    return;
+  }
+  if (confirm('Sind Sie sicher? Alle Wochenberichte und persönlichen Daten werden gelöscht!')) {
+    clearAllData();
+    updateBackupStats();
+    hideDataDetails();
+  }
+}
+
+function initializePersonalDataListeners() {
+  var fields = ['name', 'position', 'specialist', 'department'];
+  for (var i = 0; i < fields.length; i++) {
+    var el = document.getElementById(fields[i]);
+    if (el) {
+      el.addEventListener('input', savePersonalData);
+    }
+  }
+}
+
+function initializeApp() {
+  loadTheme();
+  var storedEntries = localStorage.getItem('timesheetEntries');
+  if (storedEntries) {
+    try {
+      entries = JSON.parse(storedEntries);
+    } catch (error) {
+      entries = [];
+    }
+  }
+  var weekData = getCurrentWeekAndYear();
+  currentWeek = weekData.week;
+  currentYear = weekData.year;
+  loadPersonalData();
+  initializePersonalDataListeners();
+  var weekDisplay = document.getElementById('weekDisplay');
+  if (weekDisplay) {
+    weekDisplay.textContent = 'Woche ' + currentWeek + ', ' + currentYear;
+  }
+  displayEntries();
+  updateHomeStats();
+  updateBackupStats();
+}
+
+window.onload = initializeApp;
+</script>
+</body>
+</html>
